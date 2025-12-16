@@ -9,9 +9,10 @@ import SwiftUI
 
 @main
 struct GitlabMenubarApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+      var body: some Scene {
+        Settings {
+          Text("Settings or main app window")
         }
-    }
+      }
 }
