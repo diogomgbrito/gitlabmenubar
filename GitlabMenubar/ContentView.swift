@@ -8,14 +8,34 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var authService = AuthenticationService()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            if authService.isLocked {
+                VStack(spacing: 20) {
+                    Image(systemName: "lock.fill")
+                        .font(.largeTitle)
+                    Text("GitLab Access Locked")
+                        .font(.headline)
+                    Button("Unlock with Touch ID") {
+                        authService.unlock()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
+                .frame(width: 300, height: 200)
+                .onAppear {
+                    // Try to unlock immediately on appear
+                    authService.unlock()
+                }
+            } else if authService.isAuthenticated {
+                ProjectListView()
+            } else {
+                SetupView()
+            }
         }
-        .padding()
+        .environmentObject(authService)
     }
 }
 
