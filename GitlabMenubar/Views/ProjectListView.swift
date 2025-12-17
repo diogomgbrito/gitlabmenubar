@@ -53,7 +53,8 @@ struct ProjectListView: View {
                     authService.logout()
                 }
             }
-            .padding()
+            .padding(.top, 20)
+            .padding(.horizontal)
             
             if isLoading && allProjects.isEmpty {
                 ProgressView()
@@ -71,21 +72,25 @@ struct ProjectListView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(projects) { project in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(project.name)
-                                .font(.body)
-                            Text(project.pathWithNamespace)
+                    NavigationLink {
+                        ProjectDetailView(project: project)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(project.name)
+                                    .font(.body)
+                                Text(project.pathWithNamespace)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "star.fill")
+                                .foregroundStyle(.yellow)
+                                .font(.caption)
+                            Text("\(project.starCount)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Image(systemName: "star.fill")
-                            .foregroundStyle(.yellow)
-                            .font(.caption)
-                        Text("\(project.starCount)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -96,7 +101,7 @@ struct ProjectListView: View {
                 await loadProjects()
             }
         }
-        .onChange(of: filterMode) { _ in
+        .onChange(of: filterMode) { _, _ in
             applyFilter()
         }
     }

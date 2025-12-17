@@ -30,7 +30,9 @@ struct ContentView: View {
                     authService.unlock()
                 }
             } else if authService.isAuthenticated {
-                ProjectListView()
+                NavigationStack {
+                    ProjectListView()
+                }
             } else {
                 SetupView()
             }

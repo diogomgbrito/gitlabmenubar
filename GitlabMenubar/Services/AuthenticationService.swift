@@ -13,6 +13,8 @@ class AuthenticationService: ObservableObject {
     private let serviceName = "com.gitlabmenubar.auth"
     private let accountName = "gitlabToken"
     
+    @Published var currentUser: GitLabClient.User?
+    
     var hasToken: Bool {
         // FAST check if we can read the token
         return loadToken(isFastCheck: true) != nil
