@@ -12,24 +12,7 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            if authService.isLocked {
-                VStack(spacing: 20) {
-                    Image(systemName: "lock.fill")
-                        .font(.largeTitle)
-                    Text("GitLab Access Locked")
-                        .font(.headline)
-                    Button("Unlock with Touch ID") {
-                        authService.unlock()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding()
-                .frame(width: 300, height: 200)
-                .onAppear {
-                    // Try to unlock immediately on appear
-                    authService.unlock()
-                }
-            } else if authService.isAuthenticated {
+            if authService.isAuthenticated {
                 NavigationStack {
                     ProjectListView()
                 }

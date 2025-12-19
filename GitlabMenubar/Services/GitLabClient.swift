@@ -68,12 +68,55 @@ class GitLabClient {
         }
     }
     
+    struct GitLabErrorResponse: Codable {
+        let error: String?
+        let errorDescription: String?
+        let message: String?
+        
+        enum CodingKeys: String, CodingKey {
+            case error
+            case errorDescription = "error_description"
+            case message
+        }
+        
+        var displayMessage: String {
+            if let error = error {
+                return error
+            }
+            if let errorDescription = errorDescription {
+                return errorDescription
+            }
+            if let message = message {
+                return message
+            }
+            return "Unknown error"
+        }
+    }
+    
     enum ClientError: Error {
         case invalidURL
         case missingToken
-        case requestFailed
+        case requestFailed(String?)
         case decodingError
-        case unauthorized
+        case unauthorized(String?)
+        case expiredToken(String?)
+        
+        var localizedDescription: String {
+            switch self {
+            case .invalidURL:
+                return "Invalid URL"
+            case .missingToken:
+                return "Missing authentication token"
+            case .requestFailed(let message):
+                return message ?? "Request failed"
+            case .decodingError:
+                return "Failed to decode response"
+            case .unauthorized(let message):
+                return message ?? "Unauthorized"
+            case .expiredToken(let message):
+                return message ?? "Token has expired"
+            }
+        }
     }
     
     func fetchStarredProjects() async throws -> [Project] {
@@ -95,10 +138,10 @@ class GitLabClient {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized
+                throw ClientError.unauthorized(nil)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed
+                throw ClientError.requestFailed(nil)
             }
         }
         
@@ -112,19 +155,56 @@ class GitLabClient {
     }
     
     func validateToken() async throws -> Bool {
-        guard let token = authService.loadToken() else { return false }
+        guard let token = authService.loadToken() else { 
+            throw ClientError.missingToken
+        }
         let baseURLString = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        guard let url = URL(string: "\(baseURLString)/api/v4/user") else { return false }
+        guard let url = URL(string: "\(baseURLString)/api/v4/user") else { 
+            throw ClientError.invalidURL
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
         if let httpResponse = response as? HTTPURLResponse {
-            return httpResponse.statusCode == 200
+            if httpResponse.statusCode == 200 {
+                return true
+            }
+            
+            // Parse error response
+            if httpResponse.statusCode == 401 {
+                let errorMessage = parseErrorResponse(from: data)
+                
+                // Check if it's an expired token
+                if errorMessage.uppercased().contains("EXPIRED") {
+                    throw ClientError.expiredToken(errorMessage)
+                } else {
+                    throw ClientError.unauthorized(errorMessage)
+                }
+            }
+            
+            // Other error codes
+            let errorMessage = parseErrorResponse(from: data)
+            throw ClientError.requestFailed(errorMessage)
         }
-        return false
+        
+        throw ClientError.requestFailed(nil)
+    }
+    
+    private func parseErrorResponse(from data: Data) -> String {
+        if let errorResponse = try? JSONDecoder().decode(GitLabErrorResponse.self, from: data) {
+            return errorResponse.displayMessage
+        }
+        
+        // Fallback: try to parse as plain text
+        if let errorString = String(data: data, encoding: .utf8), !errorString.isEmpty {
+            return errorString
+        }
+        
+        return "Unknown error"
     }
     
     struct Event: Codable {
@@ -235,10 +315,10 @@ class GitLabClient {
             
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 401 {
-                    throw ClientError.unauthorized
+                    throw ClientError.unauthorized(nil)
                 }
                 guard (200...299).contains(httpResponse.statusCode) else {
-                    throw ClientError.requestFailed
+                    throw ClientError.requestFailed(nil)
                 }
             }
             
@@ -287,10 +367,10 @@ class GitLabClient {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized
+                throw ClientError.unauthorized(nil)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed
+                throw ClientError.requestFailed(nil)
             }
         }
         
@@ -321,10 +401,10 @@ class GitLabClient {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized
+                throw ClientError.unauthorized(nil)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed
+                throw ClientError.requestFailed(nil)
             }
         }
         
@@ -365,10 +445,10 @@ class GitLabClient {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized
+                throw ClientError.unauthorized(nil)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed
+                throw ClientError.requestFailed(nil)
             }
         }
         
@@ -425,10 +505,10 @@ class GitLabClient {
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized
+                throw ClientError.unauthorized(nil)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed
+                throw ClientError.requestFailed(nil)
             }
         }
         

@@ -125,7 +125,7 @@ struct ProjectMRsView: View {
             }
             
             guard let currentUser = authService.currentUser else {
-                throw GitLabClient.ClientError.unauthorized // Should not happen if fetch succeeded
+                throw GitLabClient.ClientError.unauthorized(nil)
             }
             
             // 2. Fetch "Created by me"

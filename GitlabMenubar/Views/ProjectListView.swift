@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProjectListView: View {
     @EnvironmentObject var authService: AuthenticationService
+    @StateObject private var settingsManager = SettingsManager()
     @State private var allProjects: [GitLabClient.Project] = []
     @State private var projects: [GitLabClient.Project] = []
     @State private var activeProjectIds: Set<Int> = []
@@ -17,7 +18,7 @@ struct ProjectListView: View {
     @State private var errorMessage: String?
     
     enum FilterMode: String, CaseIterable, Identifiable {
-        case active = "Active (1m)"
+        case active = "Active"
         case all = "All Starred"
         var id: String { self.rawValue }
     }
@@ -38,7 +39,7 @@ struct ProjectListView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 160)
+                .frame(width: 140)
                 
                 Button {
                     Task {
@@ -47,11 +48,15 @@ struct ProjectListView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.plain)
+                .disabled(isLoading)
+                .buttonStyle(.bordered)
                 
-                Button("Logout") {
-                    authService.logout()
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gear")
                 }
+                .buttonStyle(.plain)
             }
             .padding(.top, 20)
             .padding(.horizontal)
@@ -104,6 +109,12 @@ struct ProjectListView: View {
         .onChange(of: filterMode) { _, _ in
             applyFilter()
         }
+        .onChange(of: settingsManager.activeTimeMonths) { _, _ in
+            Task {
+                await loadProjects()
+            }
+        }
+        .environmentObject(settingsManager)
     }
     
     private func loadProjects() async {
@@ -113,8 +124,8 @@ struct ProjectListView: View {
         
         do {
             async let starredProjectsTask = client.fetchStarredProjects()
-            // 1 month ago
-            let date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+            // Use dynamic active time from settings
+            let date = Calendar.current.date(byAdding: .month, value: -settingsManager.activeTimeMonths, to: Date()) ?? Date()
             async let userEventsTask = client.fetchRecentActivityProjectIds(after: date)
             
             let (fetchedProjects, fetchedIds) = try await (starredProjectsTask, userEventsTask)

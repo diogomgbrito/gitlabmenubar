@@ -76,11 +76,7 @@ struct SetupView: View {
         
         let client = GitLabClient(authService: authService)
         
-        // Temporarily save token to verify (or pass it manually, but client reads from Keychain)
-        // Ideally client should allow passing token for validation, but for now we can save it.
-        // Actually, if we save it and it's bad, we just overwrite it later or logout.
-        
-        // Let's modify client logic? No, let's just save it. If invalid, we'll log out.
+        // Save token temporarily for validation
         let saved = authService.saveToken(token)
         if !saved {
             verifyError = "Failed to save token"
@@ -97,6 +93,13 @@ struct SetupView: View {
                         verifyError = "Invalid token or URL"
                         authService.logout()
                     }
+                }
+            } catch let error as GitLabClient.ClientError {
+                await MainActor.run {
+                    isVerifying = false
+                    // Display the specific error message from GitLab
+                    verifyError = error.localizedDescription
+                    authService.logout()
                 }
             } catch {
                 await MainActor.run {
