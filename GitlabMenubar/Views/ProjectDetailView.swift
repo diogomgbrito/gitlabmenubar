@@ -11,10 +11,10 @@ struct ProjectDetailView: View {
     let project: GitLabClient.Project
     @EnvironmentObject var authService: AuthenticationService
     @Environment(\.dismiss) private var dismiss
-    
+
     // Default to tasks tab
     @State private var selectedTab = 0
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Custom Header

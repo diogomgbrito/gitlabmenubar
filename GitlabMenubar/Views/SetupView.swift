@@ -9,11 +9,11 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject var authService: AuthenticationService
-    
+
     @State private var token: String = ""
     @State private var verifyError: String?
     @State private var isVerifying: Bool = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Connect to GitLab")

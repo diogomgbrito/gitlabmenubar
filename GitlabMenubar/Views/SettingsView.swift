@@ -11,7 +11,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthenticationService
     @StateObject private var settingsManager = SettingsManager()
-    
+
     var body: some View {
         VStack(spacing: 20) {
             HStack {

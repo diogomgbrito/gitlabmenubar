@@ -16,6 +16,9 @@ struct ProjectListView: View {
     
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var searchText = ""
+    @State private var isSearching = false
+    @State private var searchResults: [GitLabClient.Project] = []
     
     enum FilterMode: String, CaseIterable, Identifiable {
         case active = "Active"
@@ -26,7 +29,7 @@ struct ProjectListView: View {
     @State private var filterMode: FilterMode = .active
     
     var body: some View {
-        VStack {
+        VStack(spacing: 12) {
             HStack {
                 Text("Projects")
                     .font(.headline)
@@ -40,10 +43,15 @@ struct ProjectListView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 140)
+                .disabled(!searchText.isEmpty)
                 
                 Button {
                     Task {
-                        await loadProjects()
+                        if searchText.isEmpty {
+                            await loadProjects()
+                        } else {
+                            await performSearch()
+                        }
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
@@ -58,30 +66,76 @@ struct ProjectListView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.horizontal)
             .padding(.top, 20)
+            
+            HStack(spacing: 8) {
+                TextField("Search projects...", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        Task {
+                            await performSearch()
+                        }
+                    }
+                
+                Button {
+                    Task {
+                        await performSearch()
+                    }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .disabled(searchText.isEmpty || isSearching)
+                .buttonStyle(.bordered)
+                
+                if !searchText.isEmpty {
+                    Button {
+                        clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
             .padding(.horizontal)
             
-            if isLoading && allProjects.isEmpty {
+            if isLoading && allProjects.isEmpty && searchResults.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
-                VStack {
+                VStack(spacing: 12) {
                     Text("Error loading projects")
+                        .font(.headline)
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
                     Button("Retry") {
                         Task { await loadProjects() }
                     }
+                    .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+            } else if projects.isEmpty && !isLoading {
+                VStack(spacing: 12) {
+                    Text(searchText.isEmpty ? "No projects found" : "No results found")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Text(searchText.isEmpty ? "Try refreshing or check your GitLab instance" : "Try a different search term")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
             } else {
                 List(projects) { project in
                     NavigationLink {
                         ProjectDetailView(project: project)
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(project.name)
                                     .font(.body)
                                 Text(project.pathWithNamespace)
@@ -96,8 +150,10 @@ struct ProjectListView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
+                .listStyle(.plain)
             }
         }
         .frame(width: 350, height: 450)
@@ -120,6 +176,7 @@ struct ProjectListView: View {
     private func loadProjects() async {
         isLoading = true
         errorMessage = nil
+        clearSearch()
         let client = GitLabClient(authService: authService)
         
         do {
@@ -151,6 +208,37 @@ struct ProjectListView: View {
         case .active:
             self.projects = self.allProjects.filter { activeProjectIds.contains($0.id) }
         }
+    }
+    
+    private func performSearch() async {
+        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
+            clearSearch()
+            return
+        }
+        
+        isSearching = true
+        errorMessage = nil
+        let client = GitLabClient(authService: authService)
+        
+        do {
+            let results = try await client.searchProjects(query: searchText)
+            await MainActor.run {
+                self.searchResults = results
+                self.projects = results
+                self.isSearching = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isSearching = false
+            }
+        }
+    }
+    
+    private func clearSearch() {
+        searchText = ""
+        searchResults = []
+        applyFilter()
     }
 }
 

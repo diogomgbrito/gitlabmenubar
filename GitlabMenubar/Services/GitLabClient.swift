@@ -49,11 +49,12 @@ class GitLabClient {
         let iid: Int
         let title: String
         let state: String
-         let webUrl: String
+        let webUrl: String
         let author: User
         let assignees: [User]?
         let reviewers: [User]?
         let detailedMergeStatus: String?
+        let mergedAt: String?
         
         enum CodingKeys: String, CodingKey {
             case id
@@ -65,6 +66,7 @@ class GitLabClient {
             case assignees
             case reviewers
             case detailedMergeStatus = "detailed_merge_status"
+            case mergedAt = "merged_at"
         }
     }
     
@@ -93,15 +95,15 @@ class GitLabClient {
         }
     }
     
-    enum ClientError: Error {
+    enum ClientError: Error, LocalizedError {
         case invalidURL
         case missingToken
         case requestFailed(String?)
         case decodingError
         case unauthorized(String?)
         case expiredToken(String?)
-        
-        var localizedDescription: String {
+
+        var errorDescription: String? {
             switch self {
             case .invalidURL:
                 return "Invalid URL"
@@ -127,6 +129,45 @@ class GitLabClient {
         let baseURLString = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
         // Use membership=true to ensure we see projects we have access to
         guard let url = URL(string: "\(baseURLString)/api/v4/projects?starred=true&simple=true&membership=true&order_by=updated_at&sort=desc") else {
+             throw ClientError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 401 {
+                throw ClientError.unauthorized(nil)
+            }
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw ClientError.requestFailed(nil)
+            }
+        }
+        
+        do {
+            let projects = try JSONDecoder().decode([Project].self, from: data)
+            return projects
+        } catch {
+            print("Decoding error: \(error)")
+            throw ClientError.decodingError
+        }
+    }
+    
+    func searchProjects(query: String) async throws -> [Project] {
+        guard let token = authService.loadToken() else {
+            throw ClientError.missingToken
+        }
+        
+        let baseURLString = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw ClientError.invalidURL
+        }
+        
+        // Search projects with membership=true to see projects we have access to
+        guard let url = URL(string: "\(baseURLString)/api/v4/projects?search=\(encodedQuery)&simple=true&membership=true&order_by=updated_at&sort=desc&per_page=50") else {
              throw ClientError.invalidURL
         }
         
@@ -267,7 +308,9 @@ class GitLabClient {
         let description: String?
         let state: String
         let webUrl: String
-        
+        let labels: [String]
+        let assignees: [User]?
+
         enum CodingKeys: String, CodingKey {
             case id
             case iid
@@ -275,6 +318,8 @@ class GitLabClient {
             case description
             case state
             case webUrl = "web_url"
+            case labels
+            case assignees
         }
     }
     
@@ -421,37 +466,39 @@ class GitLabClient {
         guard let token = authService.loadToken() else {
             throw ClientError.missingToken
         }
-        
+
         let baseURLString = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
         var urlString = "\(baseURLString)/api/v4/projects/\(projectId)/merge_requests?state=\(state)&per_page=100"
-        
+
         if let scope = scope {
             urlString += "&scope=\(scope)"
         }
-        
+
         if let reviewerId = reviewerId {
             urlString += "&reviewer_id=\(reviewerId)"
         }
-        
+
         guard let url = URL(string: urlString) else {
              throw ClientError.invalidURL
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
-                throw ClientError.unauthorized(nil)
+                let errorMessage = parseErrorResponse(from: data)
+                throw ClientError.unauthorized(errorMessage)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
-                throw ClientError.requestFailed(nil)
+                let errorMessage = parseErrorResponse(from: data)
+                throw ClientError.requestFailed("HTTP \(httpResponse.statusCode): \(errorMessage)")
             }
         }
-        
+
         do {
             let mrs = try JSONDecoder().decode([MergeRequest].self, from: data)
             return mrs

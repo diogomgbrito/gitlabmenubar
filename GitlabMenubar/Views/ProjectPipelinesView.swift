@@ -10,7 +10,7 @@ import SwiftUI
 struct ProjectPipelinesView: View {
     let project: GitLabClient.Project
     @EnvironmentObject var authService: AuthenticationService
-    
+
     @State private var pipelines: [GitLabClient.Pipeline] = []
     @State private var isLoadingPipelines = false
     @State private var pipelineError: String?

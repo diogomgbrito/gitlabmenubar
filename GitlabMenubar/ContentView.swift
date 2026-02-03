@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authService = AuthenticationService()
-    
+
     var body: some View {
         Group {
             if authService.isAuthenticated {

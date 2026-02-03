@@ -90,7 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // Wrapper view to provide auth context for settings
 struct SettingsContentView: View {
     @StateObject private var authService = AuthenticationService()
-    
+
     var body: some View {
         NavigationStack {
             SettingsView()
