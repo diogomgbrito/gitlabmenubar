@@ -508,6 +508,73 @@ class GitLabClient {
         }
     }
     
+    struct MergeRequestDetail: Codable {
+        let id: Int
+        let iid: Int
+        let title: String
+        let description: String?
+        let state: String
+        let webUrl: String
+        let author: User
+        let assignees: [User]?
+        let reviewers: [User]?
+        let detailedMergeStatus: String?
+        let changesCount: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, iid, title, description, state
+            case webUrl = "web_url"
+            case author, assignees, reviewers
+            case detailedMergeStatus = "detailed_merge_status"
+            case changesCount = "changes_count"
+        }
+    }
+
+    func fetchMergeRequestDetail(projectId: Int, mrIid: Int) async throws -> MergeRequestDetail {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/projects/\(projectId)/merge_requests/\(mrIid)") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+        guard let detail = try? JSONDecoder().decode(MergeRequestDetail.self, from: data) else {
+            throw ClientError.decodingError
+        }
+        return detail
+    }
+
+    func fetchProjectIssue(projectId: Int, issueIid: Int) async throws -> Issue {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/projects/\(projectId)/issues/\(issueIid)") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+        guard let issue = try? JSONDecoder().decode(Issue.self, from: data) else {
+            throw ClientError.decodingError
+        }
+        return issue
+    }
+
+    func fetchMRClosesIssues(projectId: Int, mrIid: Int) async throws -> [Issue] {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/projects/\(projectId)/merge_requests/\(mrIid)/closes_issues") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+        return (try? JSONDecoder().decode([Issue].self, from: data)) ?? []
+    }
+
     struct Pipeline: Codable, Identifiable {
         let id: Int
         let iid: Int

@@ -13,24 +13,21 @@ struct ProjectTasksView: View {
 
     @AppStorage private var storedLabel: String
     @State private var selectedLabel: String = ""
-    @State private var allTasks: [GitLabClient.Issue] = []  // All fetched tasks
-    @State private var labelsWithCounts: [(label: GitLabClient.Label, count: Int)] = []  // Only labels with tasks
+    @State private var allTasks: [GitLabClient.Issue] = []
+    @State private var labelsWithCounts: [(label: GitLabClient.Label, count: Int)] = []
     @State private var isLoading = false
     @State private var taskError: String?
-    
+
     init(project: GitLabClient.Project) {
         self.project = project
-        // Per-project label persistence
         self._storedLabel = AppStorage(wrappedValue: "", "lastSelectedLabel_\(project.id)")
     }
-    
+
     var filteredTasks: [GitLabClient.Issue] {
         if selectedLabel.isEmpty {
             return allTasks
         } else {
-            return allTasks.filter { task in
-                task.labels.contains(selectedLabel)
-            }
+            return allTasks.filter { $0.labels.contains(selectedLabel) }
         }
     }
 
@@ -39,51 +36,34 @@ struct ProjectTasksView: View {
             // Label filter chips
             if !labelsWithCounts.isEmpty || isLoading {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        // "All" chip with total count
-                        LabelChip(
-                            name: "All",
-                            count: allTasks.count,
-                            color: nil,
-                            isSelected: selectedLabel.isEmpty,
-                            action: {
-                                selectedLabel = ""
-                                storedLabel = ""
-                            }
-                        )
-
-                        // Label chips with counts (only labels that have tasks)
+                    HStack(spacing: 6) {
+                        LabelChip(name: "All", count: allTasks.count, color: nil, isSelected: selectedLabel.isEmpty) {
+                            selectedLabel = ""
+                            storedLabel = ""
+                        }
                         ForEach(labelsWithCounts, id: \.label.id) { item in
-                            LabelChip(
-                                name: item.label.name,
-                                count: item.count,
-                                color: item.label.color,
-                                isSelected: selectedLabel == item.label.name,
-                                action: {
-                                    selectedLabel = item.label.name
-                                    storedLabel = item.label.name
-                                }
-                            )
+                            LabelChip(name: item.label.name, count: item.count, color: item.label.color, isSelected: selectedLabel == item.label.name) {
+                                selectedLabel = item.label.name
+                                storedLabel = item.label.name
+                            }
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                 }
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-
                 Divider()
             }
-            
+
             // Task list
             if isLoading && allTasks.isEmpty {
                 VStack {
-                    ProgressView()
-                        .padding(.top, 20)
+                    ProgressView().padding(.top, 24)
                     Spacer()
                 }
             } else if let error = taskError {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Error loading tasks")
+                        .font(.system(size: 13, weight: .medium))
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -92,11 +72,12 @@ struct ProjectTasksView: View {
                     }
                     Spacer()
                 }
-                .padding()
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else if filteredTasks.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("No open tasks found")
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                     if !selectedLabel.isEmpty {
                         Text("Filter: \(selectedLabel)")
@@ -105,36 +86,31 @@ struct ProjectTasksView: View {
                     }
                     Spacer()
                 }
-                .padding()
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 List(filteredTasks) { task in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(task.title)
-                                .font(.body)
-                                .lineLimit(1)
-                            HStack(spacing: 4) {
-                                Text("#\(task.iid) · opened")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title)
+                            .font(.system(size: 13))
+                            .lineLimit(2)
 
-                                if let assignee = task.assignees?.first {
-                                    Text("·")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Image(systemName: "person.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(assignee.name)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
+                        HStack(spacing: 4) {
+                            Text("#\(task.iid)")
+                                .foregroundStyle(.secondary)
+                            if let assignee = task.assignees?.first {
+                                Text("·")
+                                    .foregroundStyle(.secondary)
+                                Image(systemName: "person.fill")
+                                Text(assignee.name)
+                                    .lineLimit(1)
                             }
                         }
-                        Spacer()
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 4)
+                    .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if let url = URL(string: task.webUrl) {
@@ -143,13 +119,10 @@ struct ProjectTasksView: View {
                     }
                 }
                 .listStyle(.plain)
-                .listRowInsets(EdgeInsets())
                 .scrollContentBackground(.hidden)
-                .background(Color.clear)
             }
         }
         .task {
-            // Load tasks and extract labels on view appear
             if allTasks.isEmpty {
                 await loadTasksAndLabels()
             }
@@ -162,13 +135,9 @@ struct ProjectTasksView: View {
         let client = GitLabClient(authService: authService)
 
         do {
-            // Fetch all tasks (no label filter)
             let fetchedTasks = try await client.fetchProjectIssues(projectId: project.id, labels: nil)
-
-            // Fetch all project labels to get color info
             let allProjectLabels = try await client.fetchProjectLabels(projectId: project.id)
 
-            // Extract labels that are actually used in tasks
             var labelCountMap: [String: Int] = [:]
             for task in fetchedTasks {
                 for labelName in task.labels {
@@ -176,38 +145,21 @@ struct ProjectTasksView: View {
                 }
             }
 
-            // Create label objects with counts (only for labels with tasks)
             let labelsWithCounts = allProjectLabels
                 .compactMap { projectLabel -> (label: GitLabClient.Label, count: Int)? in
                     guard let count = labelCountMap[projectLabel.name] else { return nil }
                     return (label: projectLabel, count: count)
                 }
                 .sorted { lhs, rhs in
-                    // Sort by priority, then by count
                     let priorityOrder = ["todo", "in progress", "in review", "ready to test", "pending release"]
-
                     let lhsNormalized = lhs.label.name.lowercased()
                     let rhsNormalized = rhs.label.name.lowercased()
-
                     let lhsPriority = priorityOrder.firstIndex(where: { lhsNormalized.contains($0) })
                     let rhsPriority = priorityOrder.firstIndex(where: { rhsNormalized.contains($0) })
-
-                    // Both have priority - sort by priority order
-                    if let lp = lhsPriority, let rp = rhsPriority {
-                        return lp < rp
-                    }
-                    // Only lhs has priority
-                    if lhsPriority != nil {
-                        return true
-                    }
-                    // Only rhs has priority
-                    if rhsPriority != nil {
-                        return false
-                    }
-                    // Neither has priority - sort by count (descending), then alphabetically
-                    if lhs.count != rhs.count {
-                        return lhs.count > rhs.count
-                    }
+                    if let lp = lhsPriority, let rp = rhsPriority { return lp < rp }
+                    if lhsPriority != nil { return true }
+                    if rhsPriority != nil { return false }
+                    if lhs.count != rhs.count { return lhs.count > rhs.count }
                     return lhs.label.name < rhs.label.name
                 }
 
@@ -215,8 +167,6 @@ struct ProjectTasksView: View {
                 self.allTasks = fetchedTasks
                 self.labelsWithCounts = labelsWithCounts
                 self.isLoading = false
-
-                // Determine initial filter
                 determineInitialFilter()
             }
         } catch {
@@ -228,13 +178,10 @@ struct ProjectTasksView: View {
     }
 
     private func determineInitialFilter() {
-        // 1. Check if stored label exists in tasks
         if labelsWithCounts.contains(where: { $0.label.name == storedLabel }) {
             selectedLabel = storedLabel
             return
         }
-
-        // 2. Check for "ToDo" (case-insensitive)
         if let todoLabel = labelsWithCounts.first(where: {
             $0.label.name.localizedCaseInsensitiveContains("todo") && $0.label.name.count <= 6
         }) {
@@ -242,14 +189,13 @@ struct ProjectTasksView: View {
             storedLabel = todoLabel.label.name
             return
         }
-
-        // 3. Fallback to All
         selectedLabel = ""
         storedLabel = ""
     }
 }
 
-// MARK: - Label Chip Component
+// MARK: - Label Chip
+
 struct LabelChip: View {
     let name: String
     let count: Int
@@ -259,56 +205,43 @@ struct LabelChip: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                // Color indicator dot
+            HStack(spacing: 5) {
                 if let colorHex = color {
                     Circle()
                         .fill(Color(hex: colorHex) ?? .gray)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 6, height: 6)
                 }
-
                 Text(name)
                     .font(.caption)
                     .fontWeight(isSelected ? .semibold : .regular)
-
-                // Count badge
-                Text("(\(count))")
+                Text("\(count)")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                isSelected
-                    ? Color.accentColor.opacity(0.2)
-                    : Color(NSColor.controlBackgroundColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        isSelected ? Color.accentColor : Color.gray.opacity(0.3),
-                        lineWidth: isSelected ? 1.5 : 1
-                    )
-            )
-            .cornerRadius(12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.12))
+            .foregroundStyle(isSelected ? Color.white : Color.primary)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 }
 
 // MARK: - Color Extension
+
 extension Color {
     init?(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         guard hex.count == 6 else { return nil }
-        
+
         var rgb: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&rgb)
-        
+
         let r = Double((rgb & 0xFF0000) >> 16) / 255.0
         let g = Double((rgb & 0x00FF00) >> 8) / 255.0
         let b = Double(rgb & 0x0000FF) / 255.0
-        
+
         self.init(red: r, green: g, blue: b)
     }
 }

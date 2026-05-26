@@ -12,56 +12,68 @@ struct ProjectDetailView: View {
     @EnvironmentObject var authService: AuthenticationService
     @Environment(\.dismiss) private var dismiss
 
-    // Default to tasks tab
-    @State private var selectedTab = 0
+    enum Tab {
+        case tasks, mrs, pipelines
+    }
+
+    @State private var selectedTab: Tab = .tasks
 
     var body: some View {
         VStack(spacing: 0) {
-            // Custom Header
-            HStack {
-                Button(action: {
+            // Header with icon tab buttons
+            HStack(spacing: 0) {
+                Button {
                     dismiss()
-                }) {
+                } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                
-                Spacer()
-                
+                .padding(.trailing, 10)
+
                 Text(project.name)
-                    .font(.headline)
-                
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
                 Spacer()
+
+                HStack(spacing: 16) {
+                    tabButton(.tasks, icon: "checklist")
+                    tabButton(.mrs, icon: "arrow.triangle.pull")
+                    tabButton(.pipelines, icon: "hammer")
+                }
             }
-            .padding(.top, 20)
-            .padding(.horizontal)
-            .padding(.bottom, 10)
-            .background(.regularMaterial)
-            
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
             Divider()
-            
-            TabView(selection: $selectedTab) {
+
+            // Tab content
+            switch selectedTab {
+            case .tasks:
                 ProjectTasksView(project: project)
-                    .tabItem {
-                        Label("Tasks", systemImage: "checklist")
-                    }
-                    .tag(0)
-                
+            case .mrs:
                 ProjectMRsView(project: project)
-                    .tabItem {
-                        Label("MRs", systemImage: "arrow.triangle.pull")
-                    }
-                    .tag(1)
-                
+            case .pipelines:
                 ProjectPipelinesView(project: project)
-                    .tabItem {
-                        Label("Pipelines", systemImage: "hammer")
-                    }
-                    .tag(2)
             }
         }
         .navigationBarBackButtonHidden(true)
+    }
+
+    @ViewBuilder
+    private func tabButton(_ tab: Tab, icon: String) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
     }
 }
 

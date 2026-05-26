@@ -13,119 +13,55 @@ struct SettingsView: View {
     @StateObject private var settingsManager = SettingsManager()
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            // Header
             HStack {
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                
-                Text("General Settings")
-                    .font(.headline)
-                
+                .padding(.trailing, 10)
+
+                Text("Settings")
+                    .font(.system(size: 13, weight: .semibold))
+
                 Spacer()
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
-            
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
             Divider()
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Projects Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Projects")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                        
-                        HStack {
-                            Text("Active projects from last")
-                                .font(.body)
-                            
-                            Picker(selection: $settingsManager.activeTimeMonths) {
-                                ForEach(1...6, id: \.self) { months in
-                                    Text("\(months) month\(months > 1 ? "s" : "")").tag(months)
-                                }
-                            } label: {
-                                EmptyView()
-                            }
-                            .pickerStyle(.menu)
-                            .frame(width: 100)
-                            
-                            Spacer()
+
+            Form {
+                Section("Projects") {
+                    Picker("Active projects from last", selection: $settingsManager.activeTimeMonths) {
+                        ForEach(1...6, id: \.self) { months in
+                            Text("\(months) month\(months > 1 ? "s" : "")").tag(months)
                         }
-                        .padding()
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                    }
-                    
-                    Divider()
-                        .padding(.horizontal)
-                    
-                    // Account Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Account")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                        
-                        Button {
-                            authService.logout()
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .foregroundStyle(.orange)
-                                Text("Logout")
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .padding()
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal)
-                    }
-                    
-                    Divider()
-                        .padding(.horizontal)
-                    
-                    // Application Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Application")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                        
-                        Button {
-                            NSApplication.shared.terminate(nil)
-                        } label: {
-                            HStack {
-                                Image(systemName: "power")
-                                    .foregroundStyle(.red)
-                                Text("Quit App")
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .padding()
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal)
                     }
                 }
-                .padding(.vertical)
+
+                Section("Account") {
+                    Button("Logout", role: .destructive) {
+                        authService.logout()
+                        dismiss()
+                    }
+                }
+
+                Section("Application") {
+                    Button("Quit App", role: .destructive) {
+                        NSApplication.shared.terminate(nil)
+                    }
+                }
             }
-            
-            Spacer()
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
         }
-        .frame(width: 350, height: 450)
         .environmentObject(settingsManager)
     }
 }
@@ -134,4 +70,3 @@ struct SettingsView: View {
     SettingsView()
         .environmentObject(AuthenticationService())
 }
-

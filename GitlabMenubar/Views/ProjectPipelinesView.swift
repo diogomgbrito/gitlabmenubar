@@ -15,14 +15,16 @@ struct ProjectPipelinesView: View {
     @State private var isLoadingPipelines = false
     @State private var pipelineError: String?
     @State private var pipelineEmptyMessage: String = "No pipelines found"
-    
+
     var body: some View {
         Group {
             if isLoadingPipelines && pipelines.isEmpty {
                 ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = pipelineError {
-                VStack {
+                VStack(spacing: 8) {
                     Text("Error loading pipelines")
+                        .font(.system(size: 13, weight: .medium))
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -30,52 +32,53 @@ struct ProjectPipelinesView: View {
                         Task { await loadPipelines() }
                     }
                 }
-            } else if pipelines.isEmpty {
-                VStack(spacing: 8) {
-                    Text(pipelineEmptyMessage)
-                        .foregroundStyle(.secondary)
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
+            } else if pipelines.isEmpty {
+                Text(pipelineEmptyMessage)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
             } else {
                 List(pipelines) { pipeline in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            HStack {
-                                Text("#\(pipeline.id)")
-                                    .font(.headline)
-                                Text(pipeline.ref)
-                                    .font(.caption)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.secondary.opacity(0.1))
-                                    .cornerRadius(4)
-                            }
-                            
-                            let statusColor: Color = {
-                                switch pipeline.status {
-                                case "success": return .green
-                                case "running": return .blue
-                                case "failed": return .red
-                                case "canceled": return .secondary
-                                case "skipped": return .gray
-                                case "running_with_warnings", "success_with_warnings": return .yellow // Handle warnings if possible, otherwise map to existing
-                                default: return .primary
-                                }
-                            }()
-                            
+                    let statusColor: Color = {
+                        switch pipeline.status {
+                        case "success": return .green
+                        case "running": return .blue
+                        case "failed": return .red
+                        case "canceled": return .secondary
+                        case "skipped": return .gray
+                        case "running_with_warnings", "success_with_warnings": return .yellow
+                        default: return .primary
+                        }
+                    }()
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text("#\(pipeline.id)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(pipeline.ref)
+                                .font(.system(size: 13, weight: .medium))
+                                .lineLimit(1)
+                        }
+
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 5, height: 5)
                             Text(pipeline.status.capitalized)
                                 .font(.caption)
-                                .foregroundStyle(statusColor)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing) {
-                            Text(pipeline.updatedAt) // Should format this date properly ideally, but string for now
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(relativeDate(pipeline.updatedAt))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .padding(.vertical, 4)
+                    .listRowBackground(Color.clear)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if let url = URL(string: pipeline.webUrl) {
@@ -84,9 +87,7 @@ struct ProjectPipelinesView: View {
                     }
                 }
                 .listStyle(.plain)
-                .listRowInsets(EdgeInsets())
                 .scrollContentBackground(.hidden)
-                .background(Color.clear)
             }
         }
         .task {
@@ -95,63 +96,59 @@ struct ProjectPipelinesView: View {
             }
         }
     }
-    
+
+    private func relativeDate(_ isoString: String) -> String {
+        let withFractional = ISO8601DateFormatter()
+        withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        guard let date = withFractional.date(from: isoString) ?? plain.date(from: isoString) else {
+            return isoString
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
     private func loadPipelines() async {
         isLoadingPipelines = true
         pipelineError = nil
         let client = GitLabClient(authService: authService)
-        
+
         do {
-            // 1. Fetch running pipelines
             async let runningTask = client.fetchProjectPipelines(projectId: project.id, status: "running")
-            
-            // 2. Fetch failed pipelines
             async let failedTask = client.fetchProjectPipelines(projectId: project.id, status: "failed")
-            
+
             let (runningPipelines, failedPipelines) = try await (runningTask, failedTask)
-            
-            // 3. Filter failed pipelines (last 24h)
-            let callbackDate = Calendar.current.date(byAdding: .hour, value: -24, to: Date()) ?? Date()
-            let isoFormatter = ISO8601DateFormatter()
-            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            
-            // Fallback formatter without fractional seconds if needed
-            let isoFormatterSimple = ISO8601DateFormatter()
-            isoFormatterSimple.formatOptions = [.withInternetDateTime]
-            
-            let recentFailedPipelines = failedPipelines.filter { pipeline in
-                if let date = isoFormatter.date(from: pipeline.updatedAt) ?? isoFormatterSimple.date(from: pipeline.updatedAt) {
-                    return date > callbackDate
+
+            let cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: Date()) ?? Date()
+            let withFractional = ISO8601DateFormatter()
+            withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+
+            let recentFailed = failedPipelines.filter { pipeline in
+                if let date = withFractional.date(from: pipeline.updatedAt) ?? plain.date(from: pipeline.updatedAt) {
+                    return date > cutoff
                 }
                 return false
             }
-            
-            // 4. Merge and Sort
-            // Combine running + recent failed
-            let combinedPipelines = (runningPipelines + recentFailedPipelines).sorted(by: { $0.id > $1.id })
-            
-            await MainActor.run {
-                self.pipelines = combinedPipelines
-            }
-            
-            if combinedPipelines.isEmpty {
-                 // Check existence logic allows distinguishing distinct empty states
+
+            let combined = (runningPipelines + recentFailed).sorted { $0.id > $1.id }
+
+            await MainActor.run { self.pipelines = combined }
+
+            if combined.isEmpty {
                 let anyPipelines = try await client.fetchProjectPipelines(projectId: project.id, status: nil)
-                
                 await MainActor.run {
-                    if anyPipelines.isEmpty {
-                        self.pipelineEmptyMessage = "No pipelines found for this project"
-                    } else {
-                         self.pipelineEmptyMessage = "No active or recently failed pipelines"
-                    }
+                    self.pipelineEmptyMessage = anyPipelines.isEmpty
+                        ? "No pipelines found for this project"
+                        : "No active or recently failed pipelines"
                     self.isLoadingPipelines = false
                 }
             } else {
-                await MainActor.run {
-                    self.isLoadingPipelines = false
-                }
+                await MainActor.run { self.isLoadingPipelines = false }
             }
-            
         } catch {
             await MainActor.run {
                 self.pipelineError = error.localizedDescription

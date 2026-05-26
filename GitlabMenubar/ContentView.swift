@@ -20,6 +20,7 @@ struct ContentView: View {
                 SetupView()
             }
         }
+        .background(.ultraThinMaterial)
         .environmentObject(authService)
     }
 }
