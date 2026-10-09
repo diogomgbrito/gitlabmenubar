@@ -132,7 +132,7 @@ struct ReviewsView: View {
                 await load()
             }
         }
-        .refreshesClaudeSessions()
+        .refreshesReviewSessions()
     }
 
     @ViewBuilder
@@ -173,7 +173,7 @@ struct ReviewsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                    ClaudeSessionBadge(target: target)
+                    ReviewSessionBadge(target: target)
                 }
                 .padding(.vertical, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,7 +181,7 @@ struct ReviewsView: View {
             }
             .buttonStyle(.plain)
 
-            ClaudeReviewControls(target: target, style: .compact)
+            ReviewControls(target: target, style: .compact)
         }
         .listRowBackground(Color.clear)
     }

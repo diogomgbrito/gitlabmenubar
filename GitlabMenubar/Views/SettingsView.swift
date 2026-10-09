@@ -78,19 +78,38 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Claude reviews") {
+                Section("AI reviews") {
+                    Picker("Default agent", selection: $settingsManager.defaultReviewAgent) {
+                        ForEach(ReviewAgent.allCases) { agent in
+                            Text(agent.displayName).tag(agent.rawValue)
+                        }
+                    }
                     TextField("Repos folder", text: $settingsManager.reposRoot)
-                    TextField("Claude CLI", text: $settingsManager.claudePath)
+                    if agentsInUse.contains(.claude) {
+                        TextField("Claude CLI", text: $settingsManager.claudePath)
+                    }
+                    if agentsInUse.contains(.opencode) {
+                        TextField("opencode CLI", text: $settingsManager.opencodePath)
+                        TextField("opencode model", text: $settingsManager.opencodeModel, prompt: Text("default"))
+                    }
+                    if agentsInUse.contains(.codex) {
+                        TextField("Codex CLI", text: $settingsManager.codexPath)
+                        TextField("Codex model", text: $settingsManager.codexModel, prompt: Text("default"))
+                    }
+                    Text(permissionsHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if watchedProjects.isEmpty {
-                        Text("Watch a project (bell icon) to set up Claude reviews for it.")
+                        Text("Watch a project (bell icon) to set up AI reviews for it.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(watchedProjects) { project in
-                            claudeProjectRow(project)
+                            reviewProjectRow(project)
                         }
-                        Text("Auto: a review request starts a background Claude session in that repo.")
+                        Text("Auto-review: a review request starts a background review session in that repo, with the project's agent. ⋯ sets the agent and repo folder.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -117,7 +136,7 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func claudeProjectRow(_ project: GitLabClient.Project) -> some View {
+    private func reviewProjectRow(_ project: GitLabClient.Project) -> some View {
         let repo = LocalRepoResolver.shared.repo(for: project.id, pathWithNamespace: project.pathWithNamespace)
         let hasOverride = settingsManager.repoPathOverrides[String(project.id)] != nil
 
@@ -126,7 +145,7 @@ struct SettingsView: View {
                 Text(project.name)
                     .font(.system(size: 12, weight: .medium))
                 if let repo {
-                    Text((repo.url.path as NSString).abbreviatingWithTildeInPath + (repo.hasReviewCommand ? "  · /review-mr" : ""))
+                    Text((repo.url.path as NSString).abbreviatingWithTildeInPath + (repo.hasReviewCommand ? "  · /review-mr" : "") + (settingsManager.projectReviewAgents[String(project.id)].flatMap(ReviewAgent.init(rawValue:)).map { "  · \($0.displayName)" } ?? ""))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -140,30 +159,70 @@ struct SettingsView: View {
 
             Spacer(minLength: 0)
 
+            HStack(spacing: 6) {
+                Text("Auto-review")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle("Auto-review", isOn: Binding(
+                    get: { settingsManager.autoReviewProjectIds.contains(project.id) },
+                    set: { _ in settingsManager.toggleAutoReview(project.id) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+            }
+            .fixedSize()
+            .help("Start a review automatically when you're asked to review an MR in this project")
+
             Menu {
-                Button("Choose folder…") { chooseRepo(for: project) }
+                Picker("Agent", selection: agentBinding(for: project)) {
+                    Text("Default (\(ReviewAgent(rawValue: settingsManager.defaultReviewAgent)?.displayName ?? "Claude Code"))").tag("")
+                    ForEach(ReviewAgent.allCases) { agent in
+                        Text(agent.displayName).tag(agent.rawValue)
+                    }
+                }
+                Divider()
+                Button("Choose repo folder…") { chooseRepo(for: project) }
                 if hasOverride {
-                    Button("Auto-detect") {
+                    Button("Auto-detect repo") {
                         settingsManager.repoPathOverrides[String(project.id)] = nil
                     }
                 }
             } label: {
-                Image(systemName: "folder")
+                Image(systemName: "ellipsis.circle")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Set local repo")
-
-            Toggle("Auto", isOn: Binding(
-                get: { settingsManager.autoReviewProjectIds.contains(project.id) },
-                set: { _ in settingsManager.toggleAutoReview(project.id) }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .font(.caption)
-            .help("Start a Claude review automatically when you're asked to review")
+            .help("Agent and local repo")
         }
+    }
+
+    /// Reviews run `glab`, which needs shell + network permission in the agent.
+    private var permissionsHint: String {
+        var lines = ["Agents need permission to run glab (shell with network) to read and post reviews."]
+        if agentsInUse.contains(.claude) { lines.append("Claude Code: auto mode works; otherwise allow Bash(glab:*).") }
+        if agentsInUse.contains(.opencode) { lines.append("opencode: allowed by default, unless your config restricts shell.") }
+        if agentsInUse.contains(.codex) {
+            lines.append("Codex: network is off by default — set network_access = true under [sandbox_workspace_write] in ~/.codex/config.toml, or use --sandbox danger-full-access.")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Agents used by the default or by any project — only their CLI settings are shown.
+    private var agentsInUse: Set<ReviewAgent> {
+        var agents: Set<ReviewAgent> = [ReviewAgent(rawValue: settingsManager.defaultReviewAgent) ?? .claude]
+        for raw in settingsManager.projectReviewAgents.values {
+            if let agent = ReviewAgent(rawValue: raw) { agents.insert(agent) }
+        }
+        return agents
+    }
+
+    private func agentBinding(for project: GitLabClient.Project) -> Binding<String> {
+        Binding(
+            get: { settingsManager.projectReviewAgents[String(project.id)] ?? "" },
+            set: { settingsManager.projectReviewAgents[String(project.id)] = $0.isEmpty ? nil : $0 }
+        )
     }
 
     private func chooseRepo(for project: GitLabClient.Project) {

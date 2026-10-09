@@ -111,7 +111,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         saveSeenSet(key, Set(mrs.map(\.id)))
     }
 
-    /// Starts a Claude review automatically when enabled for the project; otherwise offers it as actions.
+    /// Starts a review (project's agent) automatically when enabled for the project; otherwise offers it as actions.
     private func handleNewReviewRequest(mr: GitLabClient.MergeRequest, project: GitLabClient.Project?) async {
         guard let project else {
             notify(project: nil, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl)
@@ -122,7 +122,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
         if settings.autoReviewProjectIds.contains(project.id) {
             do {
-                _ = try await ClaudeSessionService.shared.startReview(for: target)
+                _ = try await ReviewSessionService.shared.startReview(for: target)
                 notify(project: project, event: "Review started — !\(mr.iid)", body: mr.title, url: mr.webUrl,
                        category: Category.reviewStarted, extraInfo: target.userInfo)
                 return
@@ -215,7 +215,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     // MARK: - Delivery
 
     private func registerCategories() {
-        let review = UNNotificationAction(identifier: Action.review, title: "Review with Claude")
+        let review = UNNotificationAction(identifier: Action.review, title: "Start review")
         let copy = UNNotificationAction(identifier: Action.copyPrompt, title: "Copy prompt")
         let open = UNNotificationAction(identifier: Action.openSession, title: "Open session", options: [.foreground])
         UNUserNotificationCenter.current().setNotificationCategories([
@@ -244,32 +244,32 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        let claude = ClaudeSessionService.shared
+        let reviews = ReviewSessionService.shared
 
         switch response.actionIdentifier {
         case Action.review:
             if let target = ReviewTarget(userInfo: userInfo) {
                 Task {
                     do {
-                        if case .alreadyRunning(let session) = try await claude.startReview(for: target) {
-                            claude.open(session)
+                        if case .alreadyRunning(let session) = try await reviews.startReview(for: target) {
+                            reviews.open(session)
                         }
                     } catch {
-                        notify(project: nil, event: "Claude review failed — !\(target.iid)",
+                        notify(project: nil, event: "Review failed — !\(target.iid)",
                                body: error.localizedDescription, url: target.webUrl)
                     }
                 }
             }
         case Action.copyPrompt:
             if let target = ReviewTarget(userInfo: userInfo) {
-                claude.copyPrompt(for: target)
+                Task { await reviews.copyPrompt(for: target) }
             }
         case Action.openSession:
             if let target = ReviewTarget(userInfo: userInfo) {
                 Task {
-                    await claude.refresh(force: true)
-                    if let session = claude.session(for: target) {
-                        claude.open(session)
+                    await reviews.refresh(force: true)
+                    if let session = reviews.session(for: target) {
+                        reviews.open(session)
                     }
                 }
             }

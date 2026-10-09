@@ -85,7 +85,49 @@ class SettingsManager: ObservableObject {
         }
     }
 
-    /// Projects where a review request starts a Claude review session automatically.
+    /// Default agent for reviews (`ReviewAgent` raw value).
+    @Published var defaultReviewAgent: String {
+        didSet {
+            UserDefaults.standard.set(defaultReviewAgent, forKey: "defaultReviewAgent")
+        }
+    }
+
+    /// Per-project agent choice, keyed by GitLab project id (as String). Missing = default.
+    @Published var projectReviewAgents: [String: String] {
+        didSet {
+            UserDefaults.standard.set(projectReviewAgents, forKey: "projectReviewAgents")
+        }
+    }
+
+    /// Path to the `opencode` CLI; a bare name is resolved through the login shell.
+    @Published var opencodePath: String {
+        didSet {
+            UserDefaults.standard.set(opencodePath, forKey: "opencodePath")
+        }
+    }
+
+    /// `provider/model` passed to `opencode run -m`; empty = opencode's default.
+    @Published var opencodeModel: String {
+        didSet {
+            UserDefaults.standard.set(opencodeModel, forKey: "opencodeModel")
+        }
+    }
+
+    /// Path to the `codex` CLI; a bare name is resolved through the login shell.
+    @Published var codexPath: String {
+        didSet {
+            UserDefaults.standard.set(codexPath, forKey: "codexPath")
+        }
+    }
+
+    /// Model passed to `codex exec -m`; empty = Codex's default.
+    @Published var codexModel: String {
+        didSet {
+            UserDefaults.standard.set(codexModel, forKey: "codexModel")
+        }
+    }
+
+    /// Projects where a review request starts a review session automatically.
     @Published var autoReviewProjectIds: Set<Int> {
         didSet {
             UserDefaults.standard.set(Array(autoReviewProjectIds), forKey: "autoReviewProjectIds")
@@ -110,6 +152,12 @@ class SettingsManager: ObservableObject {
         self.claudePath = defaults.string(forKey: "claudePath") ?? "~/.local/bin/claude"
         self.repoPathOverrides = defaults.dictionary(forKey: "repoPathOverrides") as? [String: String] ?? [:]
         self.autoReviewProjectIds = Set(defaults.array(forKey: "autoReviewProjectIds") as? [Int] ?? [])
+        self.defaultReviewAgent = defaults.string(forKey: "defaultReviewAgent") ?? "claude"
+        self.projectReviewAgents = defaults.dictionary(forKey: "projectReviewAgents") as? [String: String] ?? [:]
+        self.opencodePath = defaults.string(forKey: "opencodePath") ?? "opencode"
+        self.opencodeModel = defaults.string(forKey: "opencodeModel") ?? ""
+        self.codexPath = defaults.string(forKey: "codexPath") ?? "codex"
+        self.codexModel = defaults.string(forKey: "codexModel") ?? ""
     }
 
     func toggleAutoReview(_ id: Int) {

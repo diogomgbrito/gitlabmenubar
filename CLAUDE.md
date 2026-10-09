@@ -35,9 +35,11 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `AuthenticationService`Manages GitLab URL config, keychain-based token storage, and authentication state. Published properties trigger UI updates when auth state changes.
    - `GitLabClient`Handles all GitLab API v4 requests. Requires AuthenticationService instance for token access. All fetch methods are async/throws.
    - `SettingsManager`Manages user preferences via UserDefaults (e.g., activeTimeMonths for filtering recent projects).
-   - `NotificationService`Polls watched projects and posts notifications. Review requests get "Review with Claude" / "Copy prompt" actions, or auto-start a Claude review when enabled for the project.
+   - `NotificationService`Polls watched projects and posts notifications. Review requests get "Start review" / "Copy prompt" actions, or auto-start a review when enabled for the project.
    - `LocalRepoResolver`Maps a GitLab project to its local clone by matching `.git/config` origin against `path_with_namespace` under the repos folder (default `~/brilean/git`), w/ per-project overrides. Detects `.claude/commands/review-mr.md`.
-   - `ClaudeSessionService`Starts background Claude Code review sessions (`claude --bg -n "Review <project> !<iid>" "/review-mr <iid>"`) in the local repo, tracks them via `claude agents --json` (matched by session name), opens them w/ `claude attach` in Terminal, builds the `@<repo> /review-mr <iid>` paste prompt.
+   - `ReviewSessionService`Runs MR reviews w/ a CLI agent (`ReviewAgent`: Claude Code, opencode or Codex; per-project choice, default in Settings). Claude: `claude --bg -n "Review <project> !<iid>" "/review-mr <iid>"`, tracked via `claude agents --json` by name, opened w/ `claude attach`. opencode: detached `opencode run --format json --title …` (log in ~/Library/Logs/GitlabMenubar), session id from first JSON event stored in UserDefaults, "working" = process alive, opened w/ `opencode -s <id>` in the repo. Codex: detached `codex exec --json -s read-only -C <repo>` (session id = `thread.started.thread_id`; no network in its sandbox, so the MR data must be in the prompt), continued w/ `exec … resume <id>`, opened w/ `codex resume <id> -C <repo>`. Re-running a review continues the MR's existing session (Claude: `stop` if alive, then `--bg --resume <sessionId>`; opencode `run -s`; Codex `exec resume`). Background non-Claude runs get an instruction not to write to GitLab until resumed.
+   - `AgentCommandSync`Keeps a converted copy of `.claude/commands/review-mr.md` for other agents (opencode command `.opencode/commands/review-mr.md`; Codex skill `.agents/skills/review-mr/SKILL.md` w/ `` !`cmd` `` → "run `cmd`"; project-agnostic: `glab -R <path>` → `-R "$(git remote get-url origin)"` plus a "Step 0 — Repository" section, marked `generated-by: GitlabMenubar (format N)` — bump `formatVersion` when changing the conversion, git-excluded via `.git/info/exclude`, refreshed when the Claude original changes). A user-written command (no marker) is never touched.
+   - `CommandExpander`Expands the agent's `review-mr` command file into a plain prompt for headless runs (opencode v2 `run` has no `--command`) (strip frontmatter, `$ARGUMENTS`, run `` !`cmd` `` in the repo).
    - `SandboxMigration`One-time copy of UserDefaults from the old sandbox container (app was sandboxed up to 1.0.0).
 
 2. **Views Layer** (`GitlabMenubar/Views/`)
@@ -49,7 +51,7 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `MRDetailView`Full MR detail — status, assignees, reviewers, changes count, description (images/videos stripped w/ notice), linked issues resolved from both `closes_issues` API `#N` refs parsed from title/description
    - `ProjectPipelinesView`Lists pipelines w/ status dot + relative date
    - `ReviewsView`MRs awaiting your review / changed since your review, w/ Claude review controls per row
-   - `ClaudeReviewControls`Shared "Review with Claude"/"Open session" + "Copy prompt" buttons (compact for rows, full for MR detail) and `ClaudeSessionBadge`
+   - `ReviewControls`Shared "Review with <agent>" (menu: other agents) / "Open session" + "Copy prompt" buttons (compact for rows, full for MR detail) and `ReviewSessionBadge`
    - `SettingsView`App config using `Form { Section }` layout
 
 3. **App Entry & Menu Bar** (`GitlabMenubar/`)

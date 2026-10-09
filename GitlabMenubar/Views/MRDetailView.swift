@@ -184,7 +184,7 @@ struct MRDetailView: View {
 
             if mr.state == "opened" {
                 Divider()
-                ClaudeReviewControls(target: ReviewTarget(project: project, mr: mr))
+                ReviewControls(target: ReviewTarget(project: project, mr: mr))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
             }
@@ -210,7 +210,7 @@ struct MRDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .task { await loadDetail() }
-        .refreshesClaudeSessions()
+        .refreshesReviewSessions()
     }
 
     @ViewBuilder
