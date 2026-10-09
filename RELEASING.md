@@ -6,6 +6,7 @@ Install:
 
 ```bash
 brew tap diogomgbrito/gitlabmenubar https://github.com/diogomgbrito/gitlabmenubar
+brew trust diogomgbrito/gitlabmenubar
 brew install --cask gitlab-menubar
 ```
 
