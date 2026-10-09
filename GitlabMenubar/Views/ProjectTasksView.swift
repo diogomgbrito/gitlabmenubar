@@ -10,6 +10,7 @@ import SwiftUI
 struct ProjectTasksView: View {
     let project: GitLabClient.Project
     @EnvironmentObject var authService: AuthenticationService
+    @ObservedObject private var settingsManager = SettingsManager.shared
 
     @AppStorage private var storedLabel: String
     @State private var selectedLabel: String = ""
@@ -90,33 +91,49 @@ struct ProjectTasksView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 List(filteredTasks) { task in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                            .font(.system(size: 13))
-                            .lineLimit(2)
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(task.title)
+                                .font(.system(size: 13))
+                                .lineLimit(2)
 
-                        HStack(spacing: 4) {
-                            Text("#\(task.iid)")
-                                .foregroundStyle(.secondary)
-                            if let assignee = task.assignees?.first {
-                                Text("·")
+                            HStack(spacing: 4) {
+                                Text("#\(task.iid)")
                                     .foregroundStyle(.secondary)
-                                Image(systemName: "person.fill")
-                                Text(assignee.name)
-                                    .lineLimit(1)
+                                if let assignee = task.assignees?.first {
+                                    Text("·")
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "person.fill")
+                                    Text(assignee.name)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let url = URL(string: task.webUrl) {
+                                NSWorkspace.shared.open(url)
                             }
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                        Spacer(minLength: 4)
+
+                        let isWatched = settingsManager.isIssueWatched(projectId: project.id, iid: task.iid)
+                        Button {
+                            settingsManager.toggleIssueWatch(projectId: project.id, iid: task.iid)
+                            NotificationService.shared.pollNow()
+                        } label: {
+                            Image(systemName: isWatched ? "bell.fill" : "bell")
+                                .font(.system(size: 11))
+                                .foregroundStyle(isWatched ? Color.accentColor : Color.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(isWatched ? "Notifications on for this issue" : "Notify me about this issue")
                     }
                     .padding(.vertical, 4)
                     .listRowBackground(Color.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if let url = URL(string: task.webUrl) {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)

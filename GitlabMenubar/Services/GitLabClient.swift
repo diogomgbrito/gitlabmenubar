@@ -9,9 +9,14 @@ import Foundation
 
 class GitLabClient {
     private let authService: AuthenticationService
-    
+    private let session: URLSession
+
     init(authService: AuthenticationService) {
         self.authService = authService
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.httpMaximumConnectionsPerHost = 4
+        self.session = URLSession(configuration: config)
     }
     
     struct Project: Codable, Identifiable {
@@ -20,13 +25,15 @@ class GitLabClient {
         let pathWithNamespace: String
         let starCount: Int
         let webUrl: String
-        
+        let avatarUrl: String?
+
         enum CodingKeys: String, CodingKey {
             case id
             case name
             case pathWithNamespace = "path_with_namespace"
             case starCount = "star_count"
             case webUrl = "web_url"
+            case avatarUrl = "avatar_url"
         }
     }
 
@@ -55,7 +62,8 @@ class GitLabClient {
         let reviewers: [User]?
         let detailedMergeStatus: String?
         let mergedAt: String?
-        
+        let updatedAt: String?
+
         enum CodingKeys: String, CodingKey {
             case id
             case iid
@@ -67,6 +75,7 @@ class GitLabClient {
             case reviewers
             case detailedMergeStatus = "detailed_merge_status"
             case mergedAt = "merged_at"
+            case updatedAt = "updated_at"
         }
     }
     
@@ -136,7 +145,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -175,7 +184,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -208,7 +217,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 200 {
@@ -277,7 +286,7 @@ class GitLabClient {
             request.httpMethod = "GET"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                 break
@@ -356,7 +365,7 @@ class GitLabClient {
             request.httpMethod = "GET"
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 401 {
@@ -384,21 +393,25 @@ class GitLabClient {
         return allLabels
     }
     
-    func fetchProjectIssues(projectId: Int, labels: [String]? = nil) async throws -> [Issue] {
+    func fetchProjectIssues(projectId: Int, labels: [String]? = nil, assigneeId: Int? = nil) async throws -> [Issue] {
         guard let token = authService.loadToken() else {
             throw ClientError.missingToken
         }
-        
+
         let baseURLString = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
         var urlString = "\(baseURLString)/api/v4/projects/\(projectId)/issues?state=opened&per_page=100"
-        
+
         if let labels = labels, !labels.isEmpty {
             let labelsParam = labels.joined(separator: ",")
             if let encodedLabels = labelsParam.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
                 urlString += "&labels=\(encodedLabels)"
             }
         }
-        
+
+        if let assigneeId = assigneeId {
+            urlString += "&assignee_id=\(assigneeId)"
+        }
+
         // Fetch opened issues
         guard let url = URL(string: urlString) else {
              throw ClientError.invalidURL
@@ -408,7 +421,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -442,7 +455,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -486,7 +499,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {
@@ -538,7 +551,7 @@ class GitLabClient {
         }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
         guard let detail = try? JSONDecoder().decode(MergeRequestDetail.self, from: data) else {
             throw ClientError.decodingError
@@ -554,7 +567,7 @@ class GitLabClient {
         }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
         guard let issue = try? JSONDecoder().decode(Issue.self, from: data) else {
             throw ClientError.decodingError
@@ -570,7 +583,7 @@ class GitLabClient {
         }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
         return (try? JSONDecoder().decode([Issue].self, from: data)) ?? []
     }
@@ -595,6 +608,63 @@ class GitLabClient {
         }
     }
     
+    struct Note: Codable, Identifiable {
+        let id: Int
+        let body: String
+        let author: User
+        let system: Bool
+        let createdAt: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, body, author, system
+            case createdAt = "created_at"
+        }
+    }
+
+    func fetchMRNotes(projectId: Int, mrIid: Int) async throws -> [Note] {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/projects/\(projectId)/merge_requests/\(mrIid)/notes?per_page=100&order_by=created_at&sort=desc") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+        guard let notes = try? JSONDecoder().decode([Note].self, from: data) else {
+            throw ClientError.decodingError
+        }
+        return notes
+    }
+
+    struct MergeRequestApprovals: Codable {
+        let approvedBy: [ApprovedByEntry]?
+
+        enum CodingKeys: String, CodingKey {
+            case approvedBy = "approved_by"
+        }
+    }
+
+    struct ApprovedByEntry: Codable {
+        let user: User
+    }
+
+    func fetchMergeRequestApprovals(projectId: Int, mrIid: Int) async throws -> [User] {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/projects/\(projectId)/merge_requests/\(mrIid)/approvals") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+        guard let approvals = try? JSONDecoder().decode(MergeRequestApprovals.self, from: data) else {
+            throw ClientError.decodingError
+        }
+        return (approvals.approvedBy ?? []).map { $0.user }
+    }
+
     func fetchProjectPipelines(projectId: Int, status: String? = nil) async throws -> [Pipeline] {
         guard let token = authService.loadToken() else {
             throw ClientError.missingToken
@@ -615,7 +685,7 @@ class GitLabClient {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 {

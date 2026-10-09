@@ -117,3 +117,6 @@ Temporary Items
 *.backup
 **/xcshareddata/
 GitlabMenubar\ */
+
+# Release DMGs
+*.dmg

@@ -10,7 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthenticationService
-    @StateObject private var settingsManager = SettingsManager()
+    @ObservedObject private var settingsManager = SettingsManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +43,37 @@ struct SettingsView: View {
                         ForEach(1...6, id: \.self) { months in
                             Text("\(months) month\(months > 1 ? "s" : "")").tag(months)
                         }
+                    }
+                }
+
+                Section("Notifications") {
+                    Toggle("Enable notifications", isOn: $settingsManager.notificationsEnabled)
+
+                    Toggle("Review requests", isOn: $settingsManager.notifyReviewRequests)
+                        .disabled(!settingsManager.notificationsEnabled)
+                    Toggle("Assigned issues", isOn: $settingsManager.notifyAssignedIssues)
+                        .disabled(!settingsManager.notificationsEnabled)
+                    Toggle("My MR approved/merged", isOn: $settingsManager.notifyOwnMRUpdates)
+                        .disabled(!settingsManager.notificationsEnabled)
+
+                    Picker("Check every", selection: $settingsManager.pollIntervalSeconds) {
+                        Text("30 seconds").tag(30)
+                        Text("1 minute").tag(60)
+                        Text("5 minutes").tag(300)
+                        Text("15 minutes").tag(900)
+                        Text("30 minutes").tag(1800)
+                        Text("60 minutes").tag(3600)
+                    }
+                    .disabled(!settingsManager.notificationsEnabled)
+
+                    if !settingsManager.watchedProjectIds.isEmpty || !settingsManager.watchedIssueKeys.isEmpty {
+                        Text("Watching \(settingsManager.watchedProjectIds.count) project\(settingsManager.watchedProjectIds.count == 1 ? "" : "s") and \(settingsManager.watchedIssueKeys.count) issue\(settingsManager.watchedIssueKeys.count == 1 ? "" : "s"). Enable the bell icon on a project or issue to add more.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Open a project or issue and tap the bell icon to start watching it.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 

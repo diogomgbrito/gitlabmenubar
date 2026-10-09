@@ -17,7 +17,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "cloud.fill", accessibilityDescription: "GitLab")
+            if let image = NSImage(named: "MenuBarIcon") {
+                image.isTemplate = true
+                button.image = image
+            }
             button.action = #selector(togglePopover)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -28,8 +31,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.contentSize = NSSize(width: 380, height: 500)
         popover?.behavior = .transient
         popover?.contentViewController = NSHostingController(rootView: ContentView())
+
+        NotificationService.shared.start()
     }
-    
+
     @objc func togglePopover(_ sender: NSStatusBarButton) {
         guard let event = NSApp.currentEvent else { return }
         

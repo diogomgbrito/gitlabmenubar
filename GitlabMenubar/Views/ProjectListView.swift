@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ProjectListView: View {
     @EnvironmentObject var authService: AuthenticationService
-    @StateObject private var settingsManager = SettingsManager()
+    @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var allProjects: [GitLabClient.Project] = []
     @State private var projects: [GitLabClient.Project] = []
     @State private var activeProjectIds: Set<Int> = []
@@ -35,6 +35,17 @@ struct ProjectListView: View {
                 Text("Projects")
                     .font(.system(size: 15, weight: .semibold))
                 Spacer()
+
+                NavigationLink {
+                    ReviewsView()
+                } label: {
+                    Image(systemName: "arrow.triangle.pull")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+                .help("MRs needing your review")
+
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showSearch.toggle() }
                     if !showSearch { clearSearch() }

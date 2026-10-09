@@ -11,6 +11,7 @@ struct ProjectDetailView: View {
     let project: GitLabClient.Project
     @EnvironmentObject var authService: AuthenticationService
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var settingsManager = SettingsManager.shared
 
     enum Tab {
         case tasks, mrs, pipelines
@@ -40,6 +41,17 @@ struct ProjectDetailView: View {
                 Spacer()
 
                 HStack(spacing: 16) {
+                    Button {
+                        settingsManager.toggleProjectWatch(project.id)
+                        NotificationService.shared.pollNow()
+                    } label: {
+                        Image(systemName: settingsManager.isProjectWatched(project.id) ? "bell.fill" : "bell")
+                            .font(.system(size: 13))
+                            .foregroundStyle(settingsManager.isProjectWatched(project.id) ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(settingsManager.isProjectWatched(project.id) ? "Notifications on for this project" : "Notify me about this project")
+
                     tabButton(.tasks, icon: "checklist")
                     tabButton(.mrs, icon: "arrow.triangle.pull")
                     tabButton(.pipelines, icon: "hammer")
@@ -78,6 +90,6 @@ struct ProjectDetailView: View {
 }
 
 #Preview {
-    ProjectDetailView(project: GitLabClient.Project(id: 1, name: "Test Project", pathWithNamespace: "group/test-project", starCount: 10, webUrl: "https://gitlab.com/group/test-project"))
+    ProjectDetailView(project: GitLabClient.Project(id: 1, name: "Test Project", pathWithNamespace: "group/test-project", starCount: 10, webUrl: "https://gitlab.com/group/test-project", avatarUrl: nil))
         .environmentObject(AuthenticationService())
 }
