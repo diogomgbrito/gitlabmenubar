@@ -62,6 +62,36 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    // MARK: Claude reviews
+
+    /// Folder scanned for local clones of GitLab projects (one level deep).
+    @Published var reposRoot: String {
+        didSet {
+            UserDefaults.standard.set(reposRoot, forKey: "reposRoot")
+        }
+    }
+
+    /// Path to the `claude` CLI. Apps launched from Finder don't inherit the shell PATH.
+    @Published var claudePath: String {
+        didSet {
+            UserDefaults.standard.set(claudePath, forKey: "claudePath")
+        }
+    }
+
+    /// Manual project → local repo mapping, keyed by GitLab project id (as String).
+    @Published var repoPathOverrides: [String: String] {
+        didSet {
+            UserDefaults.standard.set(repoPathOverrides, forKey: "repoPathOverrides")
+        }
+    }
+
+    /// Projects where a review request starts a Claude review session automatically.
+    @Published var autoReviewProjectIds: Set<Int> {
+        didSet {
+            UserDefaults.standard.set(Array(autoReviewProjectIds), forKey: "autoReviewProjectIds")
+        }
+    }
+
     init() {
         let savedValue = UserDefaults.standard.integer(forKey: "activeTimeMonths")
         // If no value saved (returns 0), use default of 1
@@ -76,6 +106,18 @@ class SettingsManager: ObservableObject {
         self.pollIntervalSeconds = savedInterval > 0 ? savedInterval : 300
         self.watchedProjectIds = Set(defaults.array(forKey: "watchedProjectIds") as? [Int] ?? [])
         self.watchedIssueKeys = Set(defaults.array(forKey: "watchedIssueKeys") as? [String] ?? [])
+        self.reposRoot = defaults.string(forKey: "reposRoot") ?? "~/brilean/git"
+        self.claudePath = defaults.string(forKey: "claudePath") ?? "~/.local/bin/claude"
+        self.repoPathOverrides = defaults.dictionary(forKey: "repoPathOverrides") as? [String: String] ?? [:]
+        self.autoReviewProjectIds = Set(defaults.array(forKey: "autoReviewProjectIds") as? [Int] ?? [])
+    }
+
+    func toggleAutoReview(_ id: Int) {
+        if autoReviewProjectIds.contains(id) {
+            autoReviewProjectIds.remove(id)
+        } else {
+            autoReviewProjectIds.insert(id)
+        }
     }
 
     func isProjectWatched(_ id: Int) -> Bool {

@@ -35,6 +35,10 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `AuthenticationService`Manages GitLab URL config, keychain-based token storage, and authentication state. Published properties trigger UI updates when auth state changes.
    - `GitLabClient`Handles all GitLab API v4 requests. Requires AuthenticationService instance for token access. All fetch methods are async/throws.
    - `SettingsManager`Manages user preferences via UserDefaults (e.g., activeTimeMonths for filtering recent projects).
+   - `NotificationService`Polls watched projects and posts notifications. Review requests get "Review with Claude" / "Copy prompt" actions, or auto-start a Claude review when enabled for the project.
+   - `LocalRepoResolver`Maps a GitLab project to its local clone by matching `.git/config` origin against `path_with_namespace` under the repos folder (default `~/brilean/git`), w/ per-project overrides. Detects `.claude/commands/review-mr.md`.
+   - `ClaudeSessionService`Starts background Claude Code review sessions (`claude --bg -n "Review <project> !<iid>" "/review-mr <iid>"`) in the local repo, tracks them via `claude agents --json` (matched by session name), opens them w/ `claude attach` in Terminal, builds the `@<repo> /review-mr <iid>` paste prompt.
+   - `SandboxMigration`One-time copy of UserDefaults from the old sandbox container (app was sandboxed up to 1.0.0).
 
 2. **Views Layer** (`GitlabMenubar/Views/`)
    - `SetupView`Initial token entry screen (shown when not authenticated)
@@ -44,6 +48,8 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `ProjectMRsView`Shows merge requests w/ text tab filters (Open/Merged), My MRs toggle, and NavigationLink to MRDetailView
    - `MRDetailView`Full MR detail — status, assignees, reviewers, changes count, description (images/videos stripped w/ notice), linked issues resolved from both `closes_issues` API `#N` refs parsed from title/description
    - `ProjectPipelinesView`Lists pipelines w/ status dot + relative date
+   - `ReviewsView`MRs awaiting your review / changed since your review, w/ Claude review controls per row
+   - `ClaudeReviewControls`Shared "Review with Claude"/"Open session" + "Copy prompt" buttons (compact for rows, full for MR detail) and `ClaudeSessionBadge`
    - `SettingsView`App config using `Form { Section }` layout
 
 3. **App Entry & Menu Bar** (`GitlabMenubar/`)
@@ -109,5 +115,5 @@ When modifying authentication:
 
 ## Entitlements
 
- app requires `GitlabMenubar/GitlabMenubar.entitlements` w/ keychain access groups configured for secure token storage.
+Not sandboxed (since 1.1): needs to run the `claude` CLI and read local repos. `GitlabMenubar/GitlabMenubar.entitlements` only declares `network.client`.
 

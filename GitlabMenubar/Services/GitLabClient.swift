@@ -63,6 +63,8 @@ class GitLabClient {
         let detailedMergeStatus: String?
         let mergedAt: String?
         let updatedAt: String?
+        let sourceBranch: String?
+        let targetBranch: String?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -76,6 +78,8 @@ class GitLabClient {
             case detailedMergeStatus = "detailed_merge_status"
             case mergedAt = "merged_at"
             case updatedAt = "updated_at"
+            case sourceBranch = "source_branch"
+            case targetBranch = "target_branch"
         }
     }
     

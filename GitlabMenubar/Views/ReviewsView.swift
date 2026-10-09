@@ -132,6 +132,7 @@ struct ReviewsView: View {
                 await load()
             }
         }
+        .refreshesClaudeSessions()
     }
 
     @ViewBuilder
@@ -144,33 +145,43 @@ struct ReviewsView: View {
 
     @ViewBuilder
     private func row(_ item: ReviewItem) -> some View {
-        NavigationLink {
-            MRDetailView(project: item.project, mr: item.mr)
-        } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.mr.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .lineLimit(2)
+        let target = ReviewTarget(project: item.project, mr: item.mr)
+        HStack(alignment: .center, spacing: 8) {
+            NavigationLink {
+                MRDetailView(project: item.project, mr: item.mr)
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.mr.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(2)
 
-                HStack(spacing: 4) {
-                    Text("!\(item.mr.iid)")
-                        .foregroundStyle(Color.accentColor)
-                    Text("·")
-                    Text(item.project.name)
-                        .lineLimit(1)
-                    Text("·")
-                    Text(item.mr.author.username)
-                        .lineLimit(1)
-                    if let reason = item.reason {
+                    HStack(spacing: 4) {
+                        Text("!\(item.mr.iid)")
+                            .foregroundStyle(Color.accentColor)
                         Text("·")
-                        Text(reason)
-                            .foregroundStyle(.orange)
+                        Text(item.project.name)
+                            .lineLimit(1)
+                        Text("·")
+                        Text(item.mr.author.username)
+                            .lineLimit(1)
+                        if let reason = item.reason {
+                            Text("·")
+                            Text(reason)
+                                .foregroundStyle(.orange)
+                        }
                     }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    ClaudeSessionBadge(target: target)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 4)
+            .buttonStyle(.plain)
+
+            ClaudeReviewControls(target: target, style: .compact)
         }
         .listRowBackground(Color.clear)
     }

@@ -182,6 +182,13 @@ struct MRDetailView: View {
                 }
             }
 
+            if mr.state == "opened" {
+                Divider()
+                ClaudeReviewControls(target: ReviewTarget(project: project, mr: mr))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
+
             // Open in Browser button
             Divider()
             Button {
@@ -203,6 +210,7 @@ struct MRDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .task { await loadDetail() }
+        .refreshesClaudeSessions()
     }
 
     @ViewBuilder

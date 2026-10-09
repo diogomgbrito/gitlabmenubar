@@ -18,8 +18,20 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         super.init()
     }
 
+    // Notification categories / actions for review requests
+    private enum Category {
+        static let reviewRequest = "REVIEW_REQUEST"
+        static let reviewStarted = "REVIEW_STARTED"
+    }
+    private enum Action {
+        static let review = "REVIEW_WITH_CLAUDE"
+        static let copyPrompt = "COPY_PROMPT"
+        static let openSession = "OPEN_SESSION"
+    }
+
     func start() {
         UNUserNotificationCenter.current().delegate = self
+        registerCategories()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 print("Notification auth error: \(error)")
@@ -69,7 +81,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
         for projectId in settings.watchedProjectIds {
             let project = projectsById[projectId]
-            if settings.notifyReviewRequests {
+            if settings.notifyReviewRequests || settings.autoReviewProjectIds.contains(projectId) {
                 await checkReviewRequests(client: client, projectId: projectId, project: project, userId: me.id)
             }
             if settings.notifyAssignedIssues {
@@ -93,10 +105,38 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
         if !isFirstRun {
             for mr in mrs where !seen.contains(mr.id) {
-                notify(project: project, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl)
+                await handleNewReviewRequest(mr: mr, project: project)
             }
         }
         saveSeenSet(key, Set(mrs.map(\.id)))
+    }
+
+    /// Starts a Claude review automatically when enabled for the project; otherwise offers it as actions.
+    private func handleNewReviewRequest(mr: GitLabClient.MergeRequest, project: GitLabClient.Project?) async {
+        guard let project else {
+            notify(project: nil, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl)
+            return
+        }
+        let target = ReviewTarget(project: project, mr: mr)
+        let settings = SettingsManager.shared
+
+        if settings.autoReviewProjectIds.contains(project.id) {
+            do {
+                _ = try await ClaudeSessionService.shared.startReview(for: target)
+                notify(project: project, event: "Review started — !\(mr.iid)", body: mr.title, url: mr.webUrl,
+                       category: Category.reviewStarted, extraInfo: target.userInfo)
+                return
+            } catch {
+                notify(project: project, event: "Review req — !\(mr.iid)",
+                       body: "\(mr.title)\nAuto-review failed: \(error.localizedDescription)", url: mr.webUrl,
+                       category: Category.reviewRequest, extraInfo: target.userInfo)
+                return
+            }
+        }
+
+        guard settings.notifyReviewRequests else { return }
+        notify(project: project, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl,
+               category: Category.reviewRequest, extraInfo: target.userInfo)
     }
 
     private func checkAssignedIssues(client: GitLabClient, projectId: Int, project: GitLabClient.Project?, userId: Int) async {
@@ -174,12 +214,24 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - Delivery
 
-    private func notify(project: GitLabClient.Project?, event: String, body: String, url: String) {
+    private func registerCategories() {
+        let review = UNNotificationAction(identifier: Action.review, title: "Review with Claude")
+        let copy = UNNotificationAction(identifier: Action.copyPrompt, title: "Copy prompt")
+        let open = UNNotificationAction(identifier: Action.openSession, title: "Open session", options: [.foreground])
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(identifier: Category.reviewRequest, actions: [review, copy], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Category.reviewStarted, actions: [open, copy], intentIdentifiers: []),
+        ])
+    }
+
+    private func notify(project: GitLabClient.Project?, event: String, body: String, url: String,
+                        category: String? = nil, extraInfo: [String: Any] = [:]) {
         let content = UNMutableNotificationContent()
         content.title = project.map { "\($0.name) — \(event)" } ?? event
         content.body = body
         content.sound = .default
-        content.userInfo = ["url": url]
+        content.userInfo = extraInfo.merging(["url": url]) { _, new in new }
+        if let category { content.categoryIdentifier = category }
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
@@ -191,8 +243,40 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let urlString = response.notification.request.content.userInfo["url"] as? String, let url = URL(string: urlString) {
-            NSWorkspace.shared.open(url)
+        let userInfo = response.notification.request.content.userInfo
+        let claude = ClaudeSessionService.shared
+
+        switch response.actionIdentifier {
+        case Action.review:
+            if let target = ReviewTarget(userInfo: userInfo) {
+                Task {
+                    do {
+                        if case .alreadyRunning(let session) = try await claude.startReview(for: target) {
+                            claude.open(session)
+                        }
+                    } catch {
+                        notify(project: nil, event: "Claude review failed — !\(target.iid)",
+                               body: error.localizedDescription, url: target.webUrl)
+                    }
+                }
+            }
+        case Action.copyPrompt:
+            if let target = ReviewTarget(userInfo: userInfo) {
+                claude.copyPrompt(for: target)
+            }
+        case Action.openSession:
+            if let target = ReviewTarget(userInfo: userInfo) {
+                Task {
+                    await claude.refresh(force: true)
+                    if let session = claude.session(for: target) {
+                        claude.open(session)
+                    }
+                }
+            }
+        default:
+            if let urlString = userInfo["url"] as? String, let url = URL(string: urlString) {
+                NSWorkspace.shared.open(url)
+            }
         }
         completionHandler()
     }
