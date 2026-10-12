@@ -15,6 +15,19 @@ struct MRDetailView: View {
     @State private var closesIssues: [GitLabClient.Issue] = []
     @State private var isLoading = true
     @State private var loadError: String?
+    @State private var reReviewStatus: [Int: ReReviewStatus] = [:]
+
+    private enum ReReviewStatus: Equatable {
+        case sending, sent, failed(String)
+    }
+
+    private var reviewers: [GitLabClient.User] { detail?.reviewers ?? mr.reviewers ?? [] }
+
+    /// The people doing the work (author / assignees) can ping reviewers for another round.
+    private var canReRequestReview: Bool {
+        guard mr.state == "opened", let me = authService.currentUser else { return false }
+        return mr.author.id == me.id || (mr.assignees ?? []).contains { $0.id == me.id }
+    }
 
     private var statusText: String {
         if mr.state == "opened" {
@@ -78,7 +91,7 @@ struct MRDetailView: View {
                         if let assignees = mr.assignees, !assignees.isEmpty {
                             metaRow(icon: "person.fill", text: assignees.map(\.name).joined(separator: ", "))
                         }
-                        if let reviewers = mr.reviewers, !reviewers.isEmpty {
+                        if !reviewers.isEmpty && !canReRequestReview {
                             metaRow(icon: "eye.fill", text: reviewers.map(\.name).joined(separator: ", "))
                         }
                         if let count = detail?.changesCount, !count.isEmpty {
@@ -87,6 +100,23 @@ struct MRDetailView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
+
+                    // Reviewers, with re-request buttons for the author / assignees
+                    if !reviewers.isEmpty && canReRequestReview {
+                        Divider().padding(.top, 14)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Reviewers")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+
+                            ForEach(reviewers) { reviewer in
+                                reviewerRow(reviewer)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                    }
 
                     // Description
                     if isLoading {
@@ -226,10 +256,72 @@ struct MRDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func reviewerRow(_ reviewer: GitLabClient.User) -> some View {
+        let status = reReviewStatus[reviewer.id]
+        HStack(spacing: 8) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(reviewer.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                if case .failed(let message) = status {
+                    Text(message)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                } else {
+                    Text("@\(reviewer.username)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            switch status {
+            case .sending:
+                ProgressView().controlSize(.small)
+            case .sent:
+                Label("Requested", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.green)
+            case .failed, nil:
+                Button {
+                    Task { await requestReReview(reviewer) }
+                } label: {
+                    Label(status == nil ? "Ask to review" : "Retry", systemImage: "arrow.clockwise")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .help("Ask \(reviewer.name) for a new review (notifies them and adds a to-do)")
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func requestReReview(_ reviewer: GitLabClient.User) async {
+        reReviewStatus[reviewer.id] = .sending
+        let client = GitLabClient(authService: authService)
+        do {
+            try await client.requestReReview(projectPath: project.pathWithNamespace, mrIid: mr.iid, userId: reviewer.id)
+            reReviewStatus[reviewer.id] = .sent
+        } catch {
+            reReviewStatus[reviewer.id] = .failed(error.localizedDescription)
+        }
+    }
+
     private func loadDetail() async {
         isLoading = true
         loadError = nil
         let client = GitLabClient(authService: authService)
+        if authService.currentUser == nil, let user = try? await client.fetchCurrentUser() {
+            authService.currentUser = user
+        }
         do {
             async let detailTask = client.fetchMergeRequestDetail(projectId: project.id, mrIid: mr.iid)
             async let closesTask = client.fetchMRClosesIssues(projectId: project.id, mrIid: mr.iid)

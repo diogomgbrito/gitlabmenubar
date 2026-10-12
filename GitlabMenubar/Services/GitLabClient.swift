@@ -592,6 +592,54 @@ class GitLabClient {
         return (try? JSONDecoder().decode([Issue].self, from: data)) ?? []
     }
 
+    /// Re-requests a review from a reviewer (same as the ↻ button in the GitLab sidebar):
+    /// resets their review state, creates a to-do and notifies them. GraphQL only — no REST endpoint.
+    func requestReReview(projectPath: String, mrIid: Int, userId: Int) async throws {
+        let query = """
+        mutation($projectPath: ID!, $iid: String!, $userId: UserID!) {
+          mergeRequestReviewerRereview(input: {projectPath: $projectPath, iid: $iid, userId: $userId}) {
+            errors
+          }
+        }
+        """
+        let variables: [String: Any] = [
+            "projectPath": projectPath,
+            "iid": String(mrIid),
+            "userId": "gid://gitlab/User/\(userId)",
+        ]
+        let json = try await graphQL(query: query, variables: variables)
+        if let payload = (json["data"] as? [String: Any])?["mergeRequestReviewerRereview"] as? [String: Any],
+           let errors = payload["errors"] as? [String], !errors.isEmpty {
+            throw ClientError.requestFailed(errors.joined(separator: ", "))
+        }
+    }
+
+    private func graphQL(query: String, variables: [String: Any]) async throws -> [String: Any] {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/graphql") else { throw ClientError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["query": query, "variables": variables])
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 401 { throw ClientError.unauthorized(parseErrorResponse(from: data)) }
+            guard (200...299).contains(http.statusCode) else {
+                throw ClientError.requestFailed("HTTP \(http.statusCode): \(parseErrorResponse(from: data))")
+            }
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ClientError.decodingError
+        }
+        if let errors = json["errors"] as? [[String: Any]], !errors.isEmpty {
+            let messages = errors.compactMap { $0["message"] as? String }
+            throw ClientError.requestFailed(messages.isEmpty ? nil : messages.joined(separator: ", "))
+        }
+        return json
+    }
+
     struct Pipeline: Codable, Identifiable {
         let id: Int
         let iid: Int
