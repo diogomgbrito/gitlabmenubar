@@ -156,9 +156,7 @@ struct ReviewsView: View {
                         .lineLimit(2)
 
                     HStack(spacing: 4) {
-                        Text("!\(item.mr.iid)")
-                            .foregroundStyle(Color.accentColor)
-                        Text("·")
+                        IIDChip(kind: .mergeRequest, iid: item.mr.iid)
                         Text(item.project.name)
                             .lineLimit(1)
                         Text("·")

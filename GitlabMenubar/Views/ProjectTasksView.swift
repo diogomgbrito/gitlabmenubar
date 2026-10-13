@@ -98,8 +98,7 @@ struct ProjectTasksView: View {
                                 .lineLimit(2)
 
                             HStack(spacing: 4) {
-                                Text("#\(task.iid)")
-                                    .foregroundStyle(.secondary)
+                                IIDChip(kind: .issue, iid: task.iid)
                                 if let assignee = task.assignees?.first {
                                     Text("·")
                                         .foregroundStyle(.secondary)

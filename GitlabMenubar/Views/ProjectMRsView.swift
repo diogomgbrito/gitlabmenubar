@@ -146,10 +146,11 @@ struct ProjectMRsView: View {
                                 .lineLimit(2)
 
                             HStack(spacing: 5) {
+                                IIDChip(kind: .mergeRequest, iid: mr.iid)
                                 Circle()
                                     .fill(statusColor)
                                     .frame(width: 5, height: 5)
-                                Text("#\(mr.iid) · \(statusText)")
+                                Text(statusText)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 

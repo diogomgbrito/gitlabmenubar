@@ -1,6 +1,6 @@
 cask "gitlab-menubar" do
-  version "1.3.0"
-  sha256 "34b0e7f4698f5d19eaf772828dbe466375cbf67bac4dbb871e036e1edae55b17"
+  version "1.3.1"
+  sha256 "5264b0e290f40c17640d4f0b7395b8c242fbf20e98cea7ef9de185566bf7ce9d"
 
   url "https://github.com/diogomgbrito/gitlabmenubar/releases/download/v#{version}/GitlabMenubar-#{version}.dmg"
   name "GitLab Menubar"

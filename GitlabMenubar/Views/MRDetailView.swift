@@ -58,7 +58,7 @@ struct MRDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("!\(mr.iid)  \(mr.title)")
+                Text(mr.title)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -79,9 +79,7 @@ struct MRDetailView: View {
                         Text(statusText)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(statusColor)
-                        Text("· #\(mr.iid)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        IIDChip(kind: .mergeRequest, iid: mr.iid)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
@@ -176,9 +174,7 @@ struct MRDetailView: View {
                             ForEach(closesIssues) { issue in
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(spacing: 4) {
-                                        Text("#\(issue.iid)")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                        IIDChip(kind: .issue, iid: issue.iid)
                                         Text(issue.title)
                                             .font(.system(size: 12, weight: .medium))
                                             .lineLimit(2)
