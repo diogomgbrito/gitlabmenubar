@@ -592,6 +592,37 @@ class GitLabClient {
         return (try? JSONDecoder().decode([Issue].self, from: data)) ?? []
     }
 
+    struct Todo: Codable, Identifiable {
+        struct ProjectRef: Codable {
+            let id: Int
+        }
+
+        let id: Int
+        let project: ProjectRef?
+        let target: MergeRequest?
+    }
+
+    /// Pending "review requested" to-dos of the current user. GitLab creates one for every
+    /// request, including re-requests on MRs you already review.
+    func fetchPendingReviewTodos() async throws -> [Todo] {
+        guard let token = authService.loadToken() else { throw ClientError.missingToken }
+        let base = authService.gitlabURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(base)/api/v4/todos?action=review_requested&state=pending&type=MergeRequest&per_page=100") else {
+            throw ClientError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 401 { throw ClientError.unauthorized(nil) }
+            guard (200...299).contains(http.statusCode) else { throw ClientError.requestFailed(nil) }
+        }
+        guard let todos = try? JSONDecoder().decode([Todo].self, from: data) else {
+            throw ClientError.decodingError
+        }
+        return todos
+    }
+
     /// Re-requests a review from a reviewer (same as the ↻ button in the GitLab sidebar):
     /// resets their review state, creates a to-do and notifies them. GraphQL only — no REST endpoint.
     func requestReReview(projectPath: String, mrIid: Int, userId: Int) async throws {

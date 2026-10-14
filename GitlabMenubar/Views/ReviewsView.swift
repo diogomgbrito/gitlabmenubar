@@ -228,7 +228,7 @@ struct ReviewsView: View {
                     addNextTask()
 
                     for (mr, project, notes) in batch {
-                        let classification = classify(mr: mr, notes: notes, myId: me.id)
+                        let classification = classify(mr: mr, notes: notes, me: me)
                         switch classification {
                         case .awaiting:
                             awaiting.append(ReviewItem(mr: mr, project: project, reason: nil))
@@ -264,9 +264,12 @@ struct ReviewsView: View {
     }
 
     /// - No non-system notes from me → awaiting my first review.
-    /// - I have notes, and someone else was active after my last one → needs re-review.
+    /// - I have notes, and someone else was active after my last one → needs re-review
+    ///   ("re-review requested" when they used GitLab's re-request, which adds a
+    ///   "requested review from @me" system note).
     /// - I have notes and nothing happened since → drop from the list.
-    private func classify(mr: GitLabClient.MergeRequest, notes: [GitLabClient.Note], myId: Int) -> Classification {
+    private func classify(mr: GitLabClient.MergeRequest, notes: [GitLabClient.Note], me: GitLabClient.User) -> Classification {
+        let myId = me.id
         let myNotes = notes.filter { $0.author.id == myId && !$0.system }
         guard let lastMine = myNotes.map(\.createdAt).max() else {
             return .awaiting
@@ -275,6 +278,16 @@ struct ReviewsView: View {
         let laterOthers = notes.filter { $0.author.id != myId && $0.createdAt > lastMine }
         guard !laterOthers.isEmpty else {
             return .none
+        }
+
+        // e.g. "requested review from @a and removed review request for @b": only the "requested" part counts.
+        let reRequested = laterOthers.contains { note in
+            guard note.system, note.body.hasPrefix("requested review from") else { return false }
+            let requested = note.body.components(separatedBy: "removed review request").first ?? note.body
+            return requested.range(of: "@\(NSRegularExpression.escapedPattern(for: me.username))\\b", options: .regularExpression) != nil
+        }
+        if reRequested {
+            return .changed("re-review requested")
         }
 
         let commitNotes = laterOthers.filter { $0.system && $0.body.contains("commit") }

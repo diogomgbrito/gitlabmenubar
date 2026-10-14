@@ -93,6 +93,7 @@ All API calls go through `GitLabClient` methods:
 - `fetchMRClosesIssues(projectId:mrIid:)`Gets issues formally linked via "Closes #N" in MR
 - `fetchProjectPipelines(projectId:status:)`Gets recent pipelines
 - `requestReReview(projectPath:mrIid:userId:)`GraphQL `mergeRequestReviewerRereview` (no REST equivalent); shown per reviewer in `MRDetailView` when you are the MR author/assignee
+- `fetchPendingReviewTodos()`Pending `review_requested` to-dos; `NotificationService` treats a new one for an already-seen review MR as a re-request
 - `fetchProjectLabels(projectId:)`Gets all project labels for filtering
 - `validateToken()`Checks token validity and distinguishes expired vs unauthorized errors
 

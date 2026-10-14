@@ -79,6 +79,10 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
             projectsById = Dictionary(uniqueKeysWithValues: starred.map { ($0.id, $0) })
         }
 
+        // Before the per-project checks: those mark new review MRs as seen, and a re-request
+        // is told apart from a first request by the MR already being seen.
+        await checkReReviewRequests(client: client, projectsById: projectsById)
+
         for projectId in settings.watchedProjectIds {
             let project = projectsById[projectId]
             if settings.notifyReviewRequests || settings.autoReviewProjectIds.contains(projectId) {
@@ -111,10 +115,32 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         saveSeenSet(key, Set(mrs.map(\.id)))
     }
 
+    /// Re-requests ("Re-request a review" in GitLab) don't change the MR list `checkReviewRequests` diffs,
+    /// but GitLab adds a new "review requested" to-do each time: a new to-do for an MR already seen is a re-request.
+    private func checkReReviewRequests(client: GitLabClient, projectsById: [Int: GitLabClient.Project]) async {
+        let settings = SettingsManager.shared
+        guard let todos = try? await client.fetchPendingReviewTodos() else { return }
+        let key = "notif_seenReviewTodos"
+        let isFirstRun = UserDefaults.standard.object(forKey: key) == nil
+        let seen = seenSet(key)
+
+        if !isFirstRun {
+            for todo in todos where !seen.contains(todo.id) {
+                guard let mr = todo.target, mr.state == "opened", let projectId = todo.project?.id,
+                      settings.watchedProjectIds.contains(projectId),
+                      settings.notifyReviewRequests || settings.autoReviewProjectIds.contains(projectId),
+                      seenSet("notif_seenReviewMRs_\(projectId)").contains(mr.id) else { continue }
+                await handleNewReviewRequest(mr: mr, project: projectsById[projectId], isReRequest: true)
+            }
+        }
+        saveSeenSet(key, Set(todos.map(\.id)))
+    }
+
     /// Starts a review (project's agent) automatically when enabled for the project; otherwise offers it as actions.
-    private func handleNewReviewRequest(mr: GitLabClient.MergeRequest, project: GitLabClient.Project?) async {
+    private func handleNewReviewRequest(mr: GitLabClient.MergeRequest, project: GitLabClient.Project?, isReRequest: Bool = false) async {
+        let requestEvent = "\(isReRequest ? "Re-review" : "Review") req — !\(mr.iid)"
         guard let project else {
-            notify(project: nil, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl)
+            notify(project: nil, event: requestEvent, body: mr.title, url: mr.webUrl)
             return
         }
         let target = ReviewTarget(project: project, mr: mr)
@@ -127,7 +153,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
                        category: Category.reviewStarted, extraInfo: target.userInfo)
                 return
             } catch {
-                notify(project: project, event: "Review req — !\(mr.iid)",
+                notify(project: project, event: requestEvent,
                        body: "\(mr.title)\nAuto-review failed: \(error.localizedDescription)", url: mr.webUrl,
                        category: Category.reviewRequest, extraInfo: target.userInfo)
                 return
@@ -135,7 +161,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         }
 
         guard settings.notifyReviewRequests else { return }
-        notify(project: project, event: "Review req — !\(mr.iid)", body: mr.title, url: mr.webUrl,
+        notify(project: project, event: requestEvent, body: mr.title, url: mr.webUrl,
                category: Category.reviewRequest, extraInfo: target.userInfo)
     }
 
