@@ -1,10 +1,30 @@
+<div align="center">
+
+<img src="docs/images/icon.png" width="128" alt="GitlabMenubar icon">
+
 # GitlabMenubar
 
-macOS menu bar app for quick access to your GitLab projects, issues, merge requests, pipelines and review requests.
+**GitLab in your Mac menu bar — with AI code reviews.**
 
-## Install
+Projects, issues, merge requests, pipelines and review requests, one click away.<br>
+Asked to review? Let Claude Code, opencode or Codex start it for you.
 
-Requires macOS 15 (Sequoia) or later.
+[![Latest release](https://img.shields.io/github/v/release/diogomgbrito/gitlabmenubar?style=flat-square&color=FC6D26)](https://github.com/diogomgbrito/gitlabmenubar/releases/latest)
+![macOS 15+](https://img.shields.io/badge/macOS-15%2B-000000?style=flat-square&logo=apple&logoColor=white)
+![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?style=flat-square&logo=swift&logoColor=white)
+[![Homebrew cask](https://img.shields.io/badge/Homebrew-cask-FBB040?style=flat-square&logo=homebrew&logoColor=white)](#-install)
+
+[Install](#-install) · [Features](#-features) · [AI reviews](#-ai-reviews) · [Development](#%EF%B8%8F-development)
+
+<img src="docs/images/demo.gif" width="860" alt="GitlabMenubar demo">
+
+</div>
+
+---
+
+## 📦 Install
+
+Requires **macOS 15 (Sequoia)** or later.
 
 ```bash
 brew tap diogomgbrito/gitlabmenubar https://github.com/diogomgbrito/gitlabmenubar
@@ -12,28 +32,88 @@ brew trust diogomgbrito/gitlabmenubar
 brew install --cask gitlab-menubar
 ```
 
-Update with `brew upgrade --cask gitlab-menubar`.
+Update with:
 
-On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: left-click opens it, right-click shows Settings and Quit.
+```bash
+brew upgrade --cask gitlab-menubar
+```
 
-> The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose "Always Allow".
+On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit.
 
-## AI reviews
+> [!NOTE]
+> The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose **Always Allow**.
+
+## ✨ Features
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/projects.jpg" alt="Projects list">
+      <h3>🗂️ One click from the menu bar</h3>
+      Your starred GitLab projects, filtered by recent activity.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/project.jpg" alt="Project merge requests">
+      <h3>🔀 Issues, MRs and pipelines</h3>
+      Filter issues by label, see what's in review, check the build. Open an MR for reviewers, linked issues and changes — and re-request a review right from there.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/notification.jpg" alt="Review request notification">
+      <h3>🔔 Asked to review? You'll know.</h3>
+      Notifications for review requests, assigned issues, approvals and merges on the projects you watch.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/start-review.jpg" alt="Starting a review">
+      <h3>🤖 One click starts the review</h3>
+      A background agent session in your local clone, running <code>/review-mr</code>.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/agents.jpg" alt="Choosing an agent">
+      <h3>🧠 Claude Code, opencode or Codex</h3>
+      Default agent in Settings, per project, or per MR.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/review.jpg" alt="Review output in the terminal">
+      <h3>✅ Read it. Then decide what gets posted.</h3>
+      Nothing goes to GitLab until you confirm.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/rerun.jpg" alt="Re-running a review">
+      <h3>🔁 New commits? Re-run in the same session</h3>
+      The agent remembers its last review and focuses on what changed.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/auto-review.jpg" alt="Auto-review setting">
+      <h3>⚡ Or let reviews start on their own</h3>
+      Auto-review per project: the request arrives, the review is already running.
+    </td>
+  </tr>
+</table>
+
+## 🤖 AI reviews
 
 When you're asked to review an MR, GitlabMenubar can start the review for you in a coding agent: [Claude Code](https://claude.com/claude-code), [opencode](https://opencode.ai) or [Codex](https://developers.openai.com/codex). The review runs in the background in your local clone of the project, and you open the session when it's done.
 
-- **Review with <agent>** starts the review. The arrow next to it picks another agent for that MR.
-- **Re-run review** appears once the MR has a session: it runs the review again **in the same session**, so the agent knows what it reviewed before.
-- **Open session** opens it in Terminal (`claude attach`, `opencode -s <id>`, `codex resume <id>`). While the agent is working, the MR shows "Reviewing…".
-- **Copy prompt** copies the prompt to paste yourself — `@<repo> /review-mr <iid>` for `claude agents`, the full review prompt for the others.
-- **Auto-review** (per project, in Settings) starts the review as soon as the review request arrives.
+| Button | What it does |
+|---|---|
+| **Review with &lt;agent&gt;** | Starts the review. The arrow next to it picks another agent for that MR. |
+| **Re-run review** | Appears once the MR has a session: runs the review again **in the same session**, so the agent knows what it reviewed before. |
+| **Open session** | Opens it in Terminal (`claude attach`, `opencode -s <id>`, `codex resume <id>`). While the agent is working, the MR shows "Reviewing…". |
+| **Copy prompt** | Copies the prompt to paste yourself — `@<repo> /review-mr <iid>` for `claude agents`, the full review prompt for the others. |
+| **Auto-review** | Per project, in Settings: starts the review as soon as the review request arrives. |
 
 The buttons are on the Reviews list, the MR detail and the review-request notification.
 
 ### Setup — Settings → AI reviews
 
 1. **Default agent**, and per project in the **⋯** menu.
-2. **Repos folder**: where your clones live (default `~/brilean/git`). Each project is matched to its clone by the git `origin` remote; **⋯ → Choose repo folder…** picks one manually.
+2. **Repos folder**: the folder that holds your local clones (e.g. `~/code`). Each project is matched to its clone by the git `origin` remote; **⋯ → Choose repo folder…** picks one manually.
 3. **CLI path** (and model, for opencode/Codex) of the agents you use. Found automatically in the usual install locations and your shell's PATH.
 4. Claude only: run `claude` once in each repo and accept the trust prompt — background sessions only start in trusted folders.
 
@@ -46,7 +126,8 @@ Repos with `.claude/commands/review-mr.md` use it with every agent:
 
 Other repos get a generic review prompt that reads the MR with `glab`.
 
-Background runs with opencode and Codex don't post anything to GitLab: you resume the session, read the review and confirm what to post — like `/review-mr` does in Claude.
+> [!TIP]
+> Background runs with opencode and Codex don't post anything to GitLab: you resume the session, read the review and confirm what to post — like `/review-mr` does in Claude.
 
 ### Permissions: let the agent run `glab`
 
@@ -60,6 +141,6 @@ Reading the MR and posting the review run `glab`, which needs shell access **wit
 
 The app's own background Codex runs use a read-only sandbox on purpose: GitlabMenubar fetches the MR with `glab` first and puts it in the prompt, so Codex doesn't need the network until you resume the session to post.
 
-## Development
+## 🛠️ Development
 
 See [CLAUDE.md](CLAUDE.md) for build commands and architecture, and [RELEASING.md](RELEASING.md) for publishing a new version.
