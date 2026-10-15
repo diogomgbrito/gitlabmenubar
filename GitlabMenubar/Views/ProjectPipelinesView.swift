@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProjectPipelinesView: View {
     let project: GitLabClient.Project
+    var reloadToken = 0
     @EnvironmentObject var authService: AuthenticationService
 
     @State private var pipelines: [GitLabClient.Pipeline] = []
@@ -94,6 +95,9 @@ struct ProjectPipelinesView: View {
             if pipelines.isEmpty {
                 await loadPipelines()
             }
+        }
+        .onChange(of: reloadToken) {
+            Task { await loadPipelines() }
         }
     }
 

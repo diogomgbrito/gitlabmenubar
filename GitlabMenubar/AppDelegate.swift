@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import Combine
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover?
     /// Main popover content, kept between openings to restore the last visited page.
     private var mainController: NSHostingController<ContentView>?
+    private var hotkeySetting: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         SandboxMigration.run()
@@ -37,6 +39,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.contentViewController = NSHostingController(rootView: ContentView())
 
         NotificationService.shared.start()
+
+        GlobalHotkey.shared.onPress = { [weak self] in self?.toggleFromHotkey() }
+        hotkeySetting = SettingsManager.shared.$globalHotkeyEnabled.sink { enabled in
+            if enabled {
+                GlobalHotkey.shared.register()
+            } else {
+                GlobalHotkey.shared.unregister()
+            }
+        }
+    }
+
+    private func toggleFromHotkey() {
+        guard let popover = popover else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            showMainContent(fromRoot: false)
+        }
     }
 
     @objc func togglePopover(_ sender: NSStatusBarButton) {
@@ -67,9 +87,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             mainController = NSHostingController(rootView: ContentView())
         }
         popover.contentViewController = mainController
-        // Show popover anchored to the status bar button
+        show(popover, from: button)
+    }
+
+    /// Anchors the popover to the status bar button and makes it key, so keyboard
+    /// shortcuts work (a menu bar app isn't active until it activates itself).
+    private func show(_ popover: NSPopover, from button: NSStatusBarButton) {
         let positioningRect = NSRect(x: 0, y: 0, width: button.bounds.width, height: button.bounds.height)
         popover.show(relativeTo: positioningRect, of: button, preferredEdge: .minY)
+        NSApp.activate()
+        popover.contentViewController?.view.window?.makeKey()
     }
 
     @objc func openRoot() {
@@ -108,9 +135,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 mainController = nil
                 let settingsContentView = SettingsContentView()
                 popover.contentViewController = NSHostingController(rootView: settingsContentView)
-                // Show popover anchored to the status bar button
-                let positioningRect = NSRect(x: 0, y: 0, width: button.bounds.width, height: button.bounds.height)
-                popover.show(relativeTo: positioningRect, of: button, preferredEdge: .minY)
+                show(popover, from: button)
             }
         }
     }

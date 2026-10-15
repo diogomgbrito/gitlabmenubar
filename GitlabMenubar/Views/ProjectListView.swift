@@ -20,6 +20,7 @@ struct ProjectListView: View {
     @State private var isSearching = false
     @State private var searchResults: [GitLabClient.Project] = []
     @State private var showSearch = false
+    @FocusState private var searchFocused: Bool
 
     enum FilterMode: String, CaseIterable {
         case active = "Active"
@@ -48,13 +49,14 @@ struct ProjectListView: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { showSearch.toggle() }
-                    if !showSearch { clearSearch() }
+                    if showSearch { searchFocused = true } else { clearSearch() }
                 } label: {
                     Image(systemName: showSearch ? "xmark" : "magnifyingglass")
                         .foregroundStyle(.secondary)
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut("f", modifiers: .command)
 
                 Button {
                     Task {
@@ -70,6 +72,7 @@ struct ProjectListView: View {
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut("r", modifiers: .command)
                 .disabled(isLoading || isSearching)
 
                 NavigationLink {
@@ -93,6 +96,7 @@ struct ProjectListView: View {
                         .font(.system(size: 12))
                     TextField("Search projects...", text: $searchText)
                         .textFieldStyle(.plain)
+                        .focused($searchFocused)
                         .font(.system(size: 13))
                         .onSubmit {
                             Task { await performSearch() }

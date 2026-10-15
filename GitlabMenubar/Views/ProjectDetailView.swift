@@ -15,9 +15,19 @@ struct ProjectDetailView: View {
 
     enum Tab {
         case tasks, mrs, pipelines
+
+        var webPath: String {
+            switch self {
+            case .tasks: return "issues"
+            case .mrs: return "merge_requests"
+            case .pipelines: return "pipelines"
+            }
+        }
     }
 
     @State private var selectedTab: Tab = .tasks
+    /// Bumped by ⌘R; the selected tab reloads when it changes.
+    @State private var reloadToken = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,9 +62,9 @@ struct ProjectDetailView: View {
                     .buttonStyle(.plain)
                     .help(settingsManager.isProjectWatched(project.id) ? "Notifications on for this project" : "Notify me about this project")
 
-                    tabButton(.tasks, icon: "checklist")
-                    tabButton(.mrs, icon: "arrow.triangle.pull")
-                    tabButton(.pipelines, icon: "hammer")
+                    tabButton(.tasks, icon: "checklist", key: "1")
+                    tabButton(.mrs, icon: "arrow.triangle.pull", key: "2")
+                    tabButton(.pipelines, icon: "hammer", key: "3")
                 }
             }
             .padding(.horizontal, 16)
@@ -66,18 +76,25 @@ struct ProjectDetailView: View {
             // Tab content
             switch selectedTab {
             case .tasks:
-                ProjectTasksView(project: project)
+                ProjectTasksView(project: project, reloadToken: reloadToken)
             case .mrs:
-                ProjectMRsView(project: project)
+                ProjectMRsView(project: project, reloadToken: reloadToken)
             case .pipelines:
-                ProjectPipelinesView(project: project)
+                ProjectPipelinesView(project: project, reloadToken: reloadToken)
             }
         }
         .navigationBarBackButtonHidden(true)
+        .backShortcuts()
+        .shortcut("r") { reloadToken += 1 }
+        .shortcut("o") {
+            if let url = URL(string: "\(project.webUrl)/-/\(selectedTab.webPath)") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 
     @ViewBuilder
-    private func tabButton(_ tab: Tab, icon: String) -> some View {
+    private func tabButton(_ tab: Tab, icon: String, key: KeyEquivalent) -> some View {
         Button {
             selectedTab = tab
         } label: {
@@ -86,6 +103,7 @@ struct ProjectDetailView: View {
                 .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(key, modifiers: .command)
     }
 }
 

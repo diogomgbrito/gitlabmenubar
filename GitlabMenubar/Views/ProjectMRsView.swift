@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProjectMRsView: View {
     let project: GitLabClient.Project
+    var reloadToken = 0
     @EnvironmentObject var authService: AuthenticationService
 
     @State private var mrs: [GitLabClient.MergeRequest] = []
@@ -183,6 +184,9 @@ struct ProjectMRsView: View {
             if mrs.isEmpty {
                 await loadMRs()
             }
+        }
+        .onChange(of: reloadToken) {
+            Task { await loadMRs() }
         }
     }
 

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProjectTasksView: View {
     let project: GitLabClient.Project
+    var reloadToken = 0
     @EnvironmentObject var authService: AuthenticationService
     @ObservedObject private var settingsManager = SettingsManager.shared
 
@@ -19,8 +20,9 @@ struct ProjectTasksView: View {
     @State private var isLoading = false
     @State private var taskError: String?
 
-    init(project: GitLabClient.Project) {
+    init(project: GitLabClient.Project, reloadToken: Int = 0) {
         self.project = project
+        self.reloadToken = reloadToken
         self._storedLabel = AppStorage(wrappedValue: "", "lastSelectedLabel_\(project.id)")
     }
 
@@ -142,6 +144,9 @@ struct ProjectTasksView: View {
             if allTasks.isEmpty {
                 await loadTasksAndLabels()
             }
+        }
+        .onChange(of: reloadToken) {
+            Task { await loadTasksAndLabels() }
         }
     }
 

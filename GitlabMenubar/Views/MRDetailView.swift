@@ -233,8 +233,11 @@ struct MRDetailView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.accentColor)
+            .keyboardShortcut("o", modifiers: .command)
         }
         .navigationBarBackButtonHidden(true)
+        .backShortcuts()
+        .shortcut("r") { Task { await loadDetail() } }
         .task { await loadDetail() }
         .refreshesReviewSessions()
     }

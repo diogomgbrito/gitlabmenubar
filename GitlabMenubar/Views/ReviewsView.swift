@@ -60,6 +60,7 @@ struct ReviewsView: View {
                         .font(.system(size: 13))
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut("r", modifiers: .command)
                 .disabled(isLoading)
             }
             .padding(.horizontal, 16)
@@ -127,6 +128,7 @@ struct ReviewsView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .backShortcuts()
         .task {
             if totalCount == 0 {
                 await load()

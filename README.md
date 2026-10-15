@@ -40,6 +40,18 @@ brew upgrade --cask gitlab-menubar
 
 On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit. By default it opens on the projects list; set **Settings → Projects → Open at** to **Last visited page** to pick up where you left off (Option-click starts from the projects list).
 
+### ⌨️ Keyboard shortcuts
+
+**⌥⌘G** opens the popover from anywhere (turn it off in **Settings → Keyboard**). Inside the popover:
+
+| Key | Action |
+|---|---|
+| ⌘1 / ⌘2 / ⌘3 | Tasks / MRs / Pipelines tab of a project |
+| ⌘[ or Esc | Back (Esc on the projects list closes the popover) |
+| ⌘R | Refresh |
+| ⌘O | Open the project tab or MR in the browser |
+| ⌘F | Search projects |
+
 > [!NOTE]
 > The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose **Always Allow**.
 

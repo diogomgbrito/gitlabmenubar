@@ -69,6 +69,13 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    /// System-wide hotkey (`GlobalHotkey`) that toggles the popover.
+    @Published var globalHotkeyEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(globalHotkeyEnabled, forKey: "globalHotkeyEnabled")
+        }
+    }
+
     // MARK: Claude reviews
 
     /// Folder scanned for local clones of GitLab projects (one level deep).
@@ -156,6 +163,7 @@ class SettingsManager: ObservableObject {
         self.watchedProjectIds = Set(defaults.array(forKey: "watchedProjectIds") as? [Int] ?? [])
         self.watchedIssueKeys = Set(defaults.array(forKey: "watchedIssueKeys") as? [String] ?? [])
         self.openAtLastPage = defaults.bool(forKey: "openAtLastPage")
+        self.globalHotkeyEnabled = defaults.object(forKey: "globalHotkeyEnabled") == nil ? true : defaults.bool(forKey: "globalHotkeyEnabled")
         self.reposRoot = defaults.string(forKey: "reposRoot") ?? "~/brilean/git"
         self.claudePath = defaults.string(forKey: "claudePath") ?? "~/.local/bin/claude"
         self.repoPathOverrides = defaults.dictionary(forKey: "repoPathOverrides") as? [String: String] ?? [:]

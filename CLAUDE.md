@@ -40,6 +40,7 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `ReviewSessionService`Runs MR reviews w/ a CLI agent (`ReviewAgent`: Claude Code, opencode or Codex; per-project choice, default in Settings). Claude: `claude --bg -n "Review <project> !<iid>" "/review-mr <iid>"`, tracked via `claude agents --json` by name, opened w/ `claude attach`. opencode: detached `opencode run --format json --title …` (log in ~/Library/Logs/GitlabMenubar), session id from first JSON event stored in UserDefaults, "working" = process alive, opened w/ `opencode -s <id>` in the repo. Codex: detached `codex exec --json -s read-only -C <repo>` (session id = `thread.started.thread_id`; no network in its sandbox, so the MR data must be in the prompt), continued w/ `exec … resume <id>`, opened w/ `codex resume <id> -C <repo>`. Re-running a review continues the MR's existing session (Claude: `stop` if alive, then `--bg --resume <sessionId>`; opencode `run -s`; Codex `exec resume`). Background non-Claude runs get an instruction not to write to GitLab until resumed.
    - `AgentCommandSync`Keeps a converted copy of `.claude/commands/review-mr.md` for other agents (opencode command `.opencode/commands/review-mr.md`; Codex skill `.agents/skills/review-mr/SKILL.md` w/ `` !`cmd` `` → "run `cmd`"; project-agnostic: `glab -R <path>` → `-R "$(git remote get-url origin)"` plus a "Step 0 — Repository" section, marked `generated-by: GitlabMenubar (format N)` — bump `formatVersion` when changing the conversion, git-excluded via `.git/info/exclude`, refreshed when the Claude original changes). A user-written command (no marker) is never touched.
    - `CommandExpander`Expands the agent's `review-mr` command file into a plain prompt for headless runs (opencode v2 `run` has no `--command`) (strip frontmatter, `$ARGUMENTS`, run `` !`cmd` `` in the repo).
+   - `GlobalHotkey`System-wide ⌥⌘G toggling the popover, via Carbon `RegisterEventHotKey` (no Accessibility permission). Registered/unregistered by `AppDelegate` from `SettingsManager.globalHotkeyEnabled`.
    - `SandboxMigration`One-time copy of UserDefaults from the old sandbox container (app was sandboxed up to 1.0.0).
 
 2. **Views Layer** (`GitlabMenubar/Views/`)
@@ -52,6 +53,7 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
    - `ProjectPipelinesView`Lists pipelines w/ status dot + relative date
    - `ReviewsView`MRs awaiting your review / changed since your review, w/ Claude review controls per row
    - `ReviewControls`Shared "Review with <agent>" (menu: other agents) / "Open session" + "Copy prompt" buttons (compact for rows, full for MR detail) and `ReviewSessionBadge`
+   - `KeyboardShortcuts``.shortcut(key) {}` (invisible button carrying a shortcut) and `.backShortcuts()` (⌘[ / Esc dismiss on pushed pages only, so Esc on the root closes the popover)
    - `SettingsView`App config using `Form { Section }` layout
 
 3. **App Entry & Menu Bar** (`GitlabMenubar/`)
@@ -65,7 +67,7 @@ SourceKit shows many "Cannot find X in scope" errors across files — these are 
 - **Navigation**: Uses SwiftUI `NavigationStack` w/ `NavigationLink` for drill-down navigation. `ProjectDetailView` manages tab switching internally via `@State var selectedTab: Tab` enum.
 - **Token Management**: Access tokens stored in macOS Keychain (service: "com.gitlabmenubar.auth"). GitLab URL stored in UserDefaults.
 - **State Persistence**: Uses `@AppStorage` for per-project settings (e.g., last selected label in ProjectTasksView uses key "lastSelectedLabel_\(projectId)").
-- **Menu Bar Behavior**: Right-click shows context menu w/ Settings and Quit. Left-click toggles popover. Popover size: **380×500**.
+- **Menu Bar Behavior**: Right-click shows context menu w/ Settings and Quit. Left-click toggles popover. Popover size: **380×500**. Showing the popover activates the app and makes it key — required for SwiftUI `.keyboardShortcut` to fire.
 
 ### UI Design Tokens
 

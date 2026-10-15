@@ -57,6 +57,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Keyboard") {
+                    Toggle("Open with \(GlobalHotkey.displayString) from anywhere", isOn: $settingsManager.globalHotkeyEnabled)
+                    Text("In the popover: ⌘1–3 switch project tabs · ⌘[ or Esc go back · ⌘R refresh · ⌘O open in browser · ⌘F search projects")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Section("Notifications") {
                     Toggle("Enable notifications", isOn: $settingsManager.notificationsEnabled)
 
@@ -143,6 +151,7 @@ struct SettingsView: View {
         }
         .environmentObject(settingsManager)
         .task { await loadWatchedProjects() }
+        .backShortcuts()
     }
 
     @ViewBuilder
