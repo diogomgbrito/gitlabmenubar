@@ -11,7 +11,9 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var popover: NSPopover?
-    
+    /// Main popover content, kept between openings to restore the last visited page.
+    private var mainController: NSHostingController<ContentView>?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         SandboxMigration.run()
 
@@ -49,19 +51,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if popover.isShown {
                     popover.performClose(nil)
                 } else {
-                    // Reset to main content view
-                    popover.contentViewController = NSHostingController(rootView: ContentView())
-                    // Show popover anchored to the status bar button
-                    let positioningRect = NSRect(x: 0, y: 0, width: sender.bounds.width, height: sender.bounds.height)
-                    popover.show(relativeTo: positioningRect, of: sender, preferredEdge: .minY)
+                    // Option-click always starts from the projects list
+                    showMainContent(fromRoot: event.modifierFlags.contains(.option))
                 }
             }
         }
     }
+
+    /// Shows the main content, reusing the previous view (and its navigation stack)
+    /// when "Open at last visited page" is on, unless `fromRoot` is requested.
+    private func showMainContent(fromRoot: Bool) {
+        guard let popover = popover, let button = statusItem?.button else { return }
+
+        if fromRoot || !SettingsManager.shared.openAtLastPage || mainController == nil {
+            mainController = NSHostingController(rootView: ContentView())
+        }
+        popover.contentViewController = mainController
+        // Show popover anchored to the status bar button
+        let positioningRect = NSRect(x: 0, y: 0, width: button.bounds.width, height: button.bounds.height)
+        popover.show(relativeTo: positioningRect, of: button, preferredEdge: .minY)
+    }
+
+    @objc func openRoot() {
+        showMainContent(fromRoot: true)
+    }
     
     private func showContextMenu(for button: NSStatusBarButton) {
         let menu = NSMenu()
-        
+
+        if SettingsManager.shared.openAtLastPage {
+            let rootItem = NSMenuItem(title: "Open Projects", action: #selector(openRoot), keyEquivalent: "")
+            rootItem.target = self
+            menu.addItem(rootItem)
+        }
+
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -80,6 +103,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem?.button {
             if let popover = popover {
                 // Create a special view that shows settings within the auth context
+                // Settings runs with its own auth service (logout there isn't seen by the
+                // kept main view), so the next left-click starts fresh
+                mainController = nil
                 let settingsContentView = SettingsContentView()
                 popover.contentViewController = NSHostingController(rootView: settingsContentView)
                 // Show popover anchored to the status bar button

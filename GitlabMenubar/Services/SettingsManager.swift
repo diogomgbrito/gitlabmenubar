@@ -62,6 +62,13 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    /// Reopening the popover keeps the last visited page instead of resetting to the projects list.
+    @Published var openAtLastPage: Bool {
+        didSet {
+            UserDefaults.standard.set(openAtLastPage, forKey: "openAtLastPage")
+        }
+    }
+
     // MARK: Claude reviews
 
     /// Folder scanned for local clones of GitLab projects (one level deep).
@@ -148,6 +155,7 @@ class SettingsManager: ObservableObject {
         self.pollIntervalSeconds = savedInterval > 0 ? savedInterval : 300
         self.watchedProjectIds = Set(defaults.array(forKey: "watchedProjectIds") as? [Int] ?? [])
         self.watchedIssueKeys = Set(defaults.array(forKey: "watchedIssueKeys") as? [String] ?? [])
+        self.openAtLastPage = defaults.bool(forKey: "openAtLastPage")
         self.reposRoot = defaults.string(forKey: "reposRoot") ?? "~/brilean/git"
         self.claudePath = defaults.string(forKey: "claudePath") ?? "~/.local/bin/claude"
         self.repoPathOverrides = defaults.dictionary(forKey: "repoPathOverrides") as? [String: String] ?? [:]

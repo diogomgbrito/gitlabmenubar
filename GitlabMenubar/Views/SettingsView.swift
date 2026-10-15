@@ -45,6 +45,16 @@ struct SettingsView: View {
                             Text("\(months) month\(months > 1 ? "s" : "")").tag(months)
                         }
                     }
+                    Picker("Open at", selection: $settingsManager.openAtLastPage) {
+                        Text("Projects list").tag(false)
+                        Text("Last visited page").tag(true)
+                    }
+                    if settingsManager.openAtLastPage {
+                        Text("Option-click the menu bar icon, or right-click › Open Projects, to start from the projects list.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 Section("Notifications") {
