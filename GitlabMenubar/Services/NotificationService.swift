@@ -21,11 +21,11 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     // Notification categories / actions for review requests
     private enum Category {
         static let reviewRequest = "REVIEW_REQUEST"
+        static let reReviewRequest = "RE_REVIEW_REQUEST"
         static let reviewStarted = "REVIEW_STARTED"
     }
     private enum Action {
         static let review = "REVIEW_WITH_CLAUDE"
-        static let copyPrompt = "COPY_PROMPT"
         static let openSession = "OPEN_SESSION"
     }
 
@@ -45,6 +45,15 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
             Task { await self?.tick() }
         }
         Task { await tick(force: true) }
+
+        #if DEBUG
+        // `open GitlabMenubar.app --args -testReReviewNotification` posts a dummy re-review request.
+        if CommandLine.arguments.contains("-testReReviewNotification") {
+            notify(project: nil, event: "Re-review req — !607",
+                   body: "Fix QA audit bugs: email templates, ticket PDF, validation and account area (test)",
+                   url: "https://git.brilean.cloud", category: Category.reReviewRequest)
+        }
+        #endif
     }
 
     /// Triggers an immediate poll, used when the user opts a project/issue into watching
@@ -139,6 +148,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     /// Starts a review (project's agent) automatically when enabled for the project; otherwise offers it as actions.
     private func handleNewReviewRequest(mr: GitLabClient.MergeRequest, project: GitLabClient.Project?, isReRequest: Bool = false) async {
         let requestEvent = "\(isReRequest ? "Re-review" : "Review") req — !\(mr.iid)"
+        let requestCategory = isReRequest ? Category.reReviewRequest : Category.reviewRequest
         guard let project else {
             notify(project: nil, event: requestEvent, body: mr.title, url: mr.webUrl)
             return
@@ -155,14 +165,14 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
             } catch {
                 notify(project: project, event: requestEvent,
                        body: "\(mr.title)\nAuto-review failed: \(error.localizedDescription)", url: mr.webUrl,
-                       category: Category.reviewRequest, extraInfo: target.userInfo)
+                       category: requestCategory, extraInfo: target.userInfo)
                 return
             }
         }
 
         guard settings.notifyReviewRequests else { return }
         notify(project: project, event: requestEvent, body: mr.title, url: mr.webUrl,
-               category: Category.reviewRequest, extraInfo: target.userInfo)
+               category: requestCategory, extraInfo: target.userInfo)
     }
 
     private func checkAssignedIssues(client: GitLabClient, projectId: Int, project: GitLabClient.Project?, userId: Int) async {
@@ -240,13 +250,16 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - Delivery
 
+    /// One action per category: in Alert style macOS shows a single action as a visible button
+    /// (two or more collapse into an "Options" menu).
     private func registerCategories() {
         let review = UNNotificationAction(identifier: Action.review, title: "Start review")
-        let copy = UNNotificationAction(identifier: Action.copyPrompt, title: "Copy prompt")
+        let reReview = UNNotificationAction(identifier: Action.review, title: "Re-review")
         let open = UNNotificationAction(identifier: Action.openSession, title: "Open session", options: [.foreground])
         UNUserNotificationCenter.current().setNotificationCategories([
-            UNNotificationCategory(identifier: Category.reviewRequest, actions: [review, copy], intentIdentifiers: []),
-            UNNotificationCategory(identifier: Category.reviewStarted, actions: [open, copy], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Category.reviewRequest, actions: [review], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Category.reReviewRequest, actions: [reReview], intentIdentifiers: []),
+            UNNotificationCategory(identifier: Category.reviewStarted, actions: [open], intentIdentifiers: []),
         ])
     }
 
@@ -285,10 +298,6 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
                                body: error.localizedDescription, url: target.webUrl)
                     }
                 }
-            }
-        case Action.copyPrompt:
-            if let target = ReviewTarget(userInfo: userInfo) {
-                Task { await reviews.copyPrompt(for: target) }
             }
         case Action.openSession:
             if let target = ReviewTarget(userInfo: userInfo) {

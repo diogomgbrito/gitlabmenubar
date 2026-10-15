@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthenticationService
     @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var watchedProjects: [GitLabClient.Project] = []
+    @State private var alertStyle: UNAlertStyle?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,6 +87,19 @@ struct SettingsView: View {
                     }
                     .disabled(!settingsManager.notificationsEnabled)
 
+                    if settingsManager.notificationsEnabled, let alertStyle, alertStyle != .alert {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(alertStyle == .none
+                                 ? "Notifications are off for GitlabMenubar in System Settings."
+                                 : "Set GitlabMenubar's notification style to Alerts to keep the Start review / Re-review button visible.")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Open Notification Settings") { openNotificationSettings() }
+                                .controlSize(.small)
+                        }
+                    }
+
                     if !settingsManager.watchedProjectIds.isEmpty || !settingsManager.watchedIssueKeys.isEmpty {
                         Text("Watching \(settingsManager.watchedProjectIds.count) project\(settingsManager.watchedProjectIds.count == 1 ? "" : "s") and \(settingsManager.watchedIssueKeys.count) issue\(settingsManager.watchedIssueKeys.count == 1 ? "" : "s"). Enable the bell icon on a project or issue to add more.")
                             .font(.caption)
@@ -151,6 +166,11 @@ struct SettingsView: View {
         }
         .environmentObject(settingsManager)
         .task { await loadWatchedProjects() }
+        .task { await loadAlertStyle() }
+        // Back from System Settings: pick up a changed notification style.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await loadAlertStyle() }
+        }
         .backShortcuts()
     }
 
@@ -254,6 +274,18 @@ struct SettingsView: View {
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url {
             settingsManager.repoPathOverrides[String(project.id)] = url.path
+        }
+    }
+
+    private func loadAlertStyle() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        alertStyle = settings.authorizationStatus == .denied ? UNAlertStyle.none : settings.alertStyle
+    }
+
+    private func openNotificationSettings() {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+            NSWorkspace.shared.open(url)
         }
     }
 
