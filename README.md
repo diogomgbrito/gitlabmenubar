@@ -38,7 +38,7 @@ Update with:
 brew upgrade --cask gitlab-menubar
 ```
 
-On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit.
+On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit. By default it opens on the projects list; set **Settings → Projects → Open at** to **Last visited page** to pick up where you left off (Option-click starts from the projects list).
 
 > [!NOTE]
 > The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose **Always Allow**.
