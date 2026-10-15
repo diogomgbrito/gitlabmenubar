@@ -14,7 +14,7 @@ Asked to review? Let Claude Code, opencode or Codex start it for you.
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI-F05138?style=flat-square&logo=swift&logoColor=white)
 [![Homebrew cask](https://img.shields.io/badge/Homebrew-cask-FBB040?style=flat-square&logo=homebrew&logoColor=white)](#-install)
 
-[Install](#-install) · [Features](#-features) · [AI reviews](#-ai-reviews) · [Development](#%EF%B8%8F-development)
+[Install](#-install) · [How to use](#-how-to-use) · [Features](#-features) · [AI reviews](#-ai-reviews) · [Development](#%EF%B8%8F-development)
 
 <img src="docs/images/demo.gif" width="860" alt="GitlabMenubar demo">
 
@@ -38,7 +38,46 @@ Update with:
 brew upgrade --cask gitlab-menubar
 ```
 
-On first launch, enter your GitLab URL and a personal access token with the `api` scope. The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit. By default it opens on the projects list; set **Settings → Projects → Open at** to **Last visited page** to pick up where you left off (Option-click starts from the projects list).
+> [!NOTE]
+> The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose **Always Allow**.
+
+## 🧭 How to use
+
+### 1. Connect to GitLab
+
+1. In GitLab, go to **Edit profile → Access tokens → Add new token**, tick the **`api`** scope and create the token.
+2. Launch the app and enter your GitLab URL (e.g. `https://gitlab.example.com`) and the token. The token is kept in the macOS keychain.
+
+The app lives in the menu bar: **left-click** opens it, **right-click** shows Settings and Quit.
+
+### 2. Star the projects you want to see
+
+> [!IMPORTANT]
+> The projects list only shows your **starred** GitLab projects. If the list is empty after connecting, you haven't starred any yet.
+
+Open each project you care about in GitLab and click **Star** at the top right of the project page. Then press **⌘R** in the app to refresh.
+
+- **Active** — starred projects you've had activity in recently. Set the window in **Settings → Projects → Active projects from last**.
+- **All** — every starred project.
+- **Search** (🔍 or **⌘F**) — finds any project you're a member of, starred or not.
+
+### 3. Browse a project
+
+Click a project to open its tabs:
+
+- **Tasks** — open issues, filtered by label (the app remembers your last label per project).
+- **MRs** — open or merged MRs; the person icon narrows to MRs you created or are reviewing. Click an MR for reviewers, linked issues and changes.
+- **Pipelines** — recent pipelines and their status.
+
+By default the app opens on the projects list. To pick up where you left off, set **Settings → Projects → Open at** to **Last visited page** (Option-click the icon to start from the projects list).
+
+### 4. Watch projects for notifications and reviews
+
+Click the **🔔 bell** in a project's header (or on an issue) to watch it. Watched projects:
+
+- send notifications for review requests, assigned issues and your own MRs being approved or merged — pick which in **Settings → Notifications**;
+- show up in the **Reviews** list (the pull-request icon at the top of the projects list), with the MRs waiting for your review;
+- can run AI reviews for you — see [AI reviews](#-ai-reviews).
 
 ### ⌨️ Keyboard shortcuts
 
@@ -51,9 +90,6 @@ On first launch, enter your GitLab URL and a personal access token with the `api
 | ⌘R | Refresh |
 | ⌘O | Open the project tab or MR in the browser |
 | ⌘F | Search projects |
-
-> [!NOTE]
-> The app is not notarized by Apple. The Homebrew cask removes the quarantine flag so macOS lets it open. After an upgrade, macOS may ask once for keychain access — choose **Always Allow**.
 
 ## ✨ Features
 
