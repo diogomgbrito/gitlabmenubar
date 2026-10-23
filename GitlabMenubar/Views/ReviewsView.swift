@@ -129,10 +129,10 @@ struct ReviewsView: View {
         }
         .navigationBarBackButtonHidden(true)
         .backShortcuts()
+        // Reload on every appearance (e.g. back from an MR you just approved or merged)
+        // so finished reviews drop out; existing rows stay visible while loading.
         .task {
-            if totalCount == 0 {
-                await load()
-            }
+            await load()
         }
         .refreshesReviewSessions()
     }
@@ -214,7 +214,10 @@ struct ReviewsView: View {
                             return []
                         }
                         var results: [(GitLabClient.MergeRequest, GitLabClient.Project, [GitLabClient.Note])] = []
-                        for mr in mrs {
+                        // Closed, merged or approved by anyone: nothing left to review.
+                        for mr in mrs where mr.state == "opened" {
+                            let approvers = (try? await client.fetchMergeRequestApprovals(projectId: project.id, mrIid: mr.iid)) ?? []
+                            if !approvers.isEmpty { continue }
                             let notes = (try? await client.fetchMRNotes(projectId: project.id, mrIid: mr.iid)) ?? []
                             results.append((mr, project, notes))
                         }
