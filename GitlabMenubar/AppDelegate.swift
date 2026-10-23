@@ -39,6 +39,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover?.contentViewController = NSHostingController(rootView: ContentView())
 
         NotificationService.shared.start()
+        UpdateService.shared.start()
 
         GlobalHotkey.shared.onPress = { [weak self] in self?.toggleFromHotkey() }
         hotkeySetting = SettingsManager.shared.$globalHotkeyEnabled.sink { enabled in
@@ -115,7 +116,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
-        
+
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
         
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
@@ -140,6 +145,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    @objc func checkForUpdates() {
+        Task { await UpdateService.shared.check(userInitiated: true) }
+    }
+
     @objc func quitApp() {
         NSApplication.shared.terminate(nil)
     }

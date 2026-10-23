@@ -14,6 +14,8 @@ struct SettingsView: View {
     @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var watchedProjects: [GitLabClient.Project] = []
     @State private var alertStyle: UNAlertStyle?
+    @ObservedObject private var updates = UpdateService.shared
+    @State private var updateCommandCopied = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -155,6 +157,35 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Updates") {
+                    Toggle("Check for updates automatically", isOn: $settingsManager.checkForUpdates)
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(updateStatus)
+                                .font(.system(size: 12, weight: .medium))
+                            Text("Installed: \(updates.currentVersion)" + (updates.brewURL == nil ? " · not installed with Homebrew" : ""))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if updates.availableVersion != nil {
+                            UpdateButtons(copied: $updateCommandCopied)
+                                .controlSize(.small)
+                        }
+                        Button("Check now") {
+                            Task { await updates.check(userInitiated: true) }
+                        }
+                        .controlSize(.small)
+                        .disabled(updates.isChecking)
+                    }
+                    if let error = updates.lastError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 Section("Application") {
                     Button("Quit App", role: .destructive) {
                         NSApplication.shared.terminate(nil)
@@ -167,6 +198,9 @@ struct SettingsView: View {
         .environmentObject(settingsManager)
         .task { await loadWatchedProjects() }
         .task { await loadAlertStyle() }
+        .onChange(of: settingsManager.checkForUpdates) { _, enabled in
+            if enabled { Task { await updates.check() } }
+        }
         // Back from System Settings: pick up a changed notification style.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await loadAlertStyle() }
@@ -235,6 +269,15 @@ struct SettingsView: View {
             .fixedSize()
             .help("Agent and local repo")
         }
+    }
+
+    private var updateStatus: String {
+        if updates.isChecking { return "Checking…" }
+        if let version = updates.availableVersion { return "Version \(version) is available" }
+        if let checked = updates.lastChecked {
+            return "Up to date · checked \(checked.formatted(.relative(presentation: .named)))"
+        }
+        return "Not checked yet"
     }
 
     /// Reviews run `glab`, which needs shell + network permission in the agent.

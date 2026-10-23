@@ -32,10 +32,12 @@ brew trust diogomgbrito/gitlabmenubar
 brew install --cask gitlab-menubar
 ```
 
-Update with:
+From 1.6.0 the app checks for updates itself: when a new version is out, it shows what's new and **Install Update** upgrades it through Homebrew and restarts. Right-click the menu bar icon › **Check for Updates…** to check now, or turn automatic checks off in **Settings → Updates**.
+
+Or update from the terminal:
 
 ```bash
-brew upgrade --cask gitlab-menubar
+brew update && brew upgrade --cask gitlab-menubar
 ```
 
 > [!NOTE]
@@ -76,7 +78,7 @@ By default the app opens on the projects list. To pick up where you left off, se
 Click the **🔔 bell** in a project's header (or on an issue) to watch it. Watched projects:
 
 - send notifications for review requests, assigned issues and your own MRs being approved or merged — pick which in **Settings → Notifications**;
-- show up in the **Reviews** list (the pull-request icon at the top of the projects list), with the MRs waiting for your review;
+- show up in the **Reviews** list (the pull-request icon at the top of the projects list), with the MRs waiting for your review (closed, merged and approved MRs drop out);
 - can run AI reviews for you — see [AI reviews](#-ai-reviews).
 
 ### ⌨️ Keyboard shortcuts

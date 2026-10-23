@@ -88,6 +88,8 @@ struct ProjectListView: View {
             .padding(.top, 16)
             .padding(.bottom, 10)
 
+            UpdateBanner()
+
             // Filter tabs or search field
             if showSearch {
                 HStack(spacing: 8) {

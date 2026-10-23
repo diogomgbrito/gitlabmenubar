@@ -76,6 +76,13 @@ class SettingsManager: ObservableObject {
         }
     }
 
+    /// Periodic check for a newer release (`UpdateService`).
+    @Published var checkForUpdates: Bool {
+        didSet {
+            UserDefaults.standard.set(checkForUpdates, forKey: "checkForUpdates")
+        }
+    }
+
     // MARK: Claude reviews
 
     /// Folder scanned for local clones of GitLab projects (one level deep).
@@ -164,6 +171,7 @@ class SettingsManager: ObservableObject {
         self.watchedIssueKeys = Set(defaults.array(forKey: "watchedIssueKeys") as? [String] ?? [])
         self.openAtLastPage = defaults.bool(forKey: "openAtLastPage")
         self.globalHotkeyEnabled = defaults.object(forKey: "globalHotkeyEnabled") == nil ? true : defaults.bool(forKey: "globalHotkeyEnabled")
+        self.checkForUpdates = defaults.object(forKey: "checkForUpdates") == nil ? true : defaults.bool(forKey: "checkForUpdates")
         self.reposRoot = defaults.string(forKey: "reposRoot") ?? "~/brilean/git"
         self.claudePath = defaults.string(forKey: "claudePath") ?? "~/.local/bin/claude"
         self.repoPathOverrides = defaults.dictionary(forKey: "repoPathOverrides") as? [String: String] ?? [:]
